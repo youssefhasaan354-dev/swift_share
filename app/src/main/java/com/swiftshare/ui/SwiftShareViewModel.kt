@@ -116,6 +116,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                 activeReceiverPayload.value = payload
                 // Start control channel and NIO data server
                 dataChannel.startReceiverServer(
+                    expectedSessionToken = payload.sessionToken,
                     onFileReceived = { file, item ->
                         recordTransfer(item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true)
                     },
@@ -153,6 +154,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                         sourceFile = file,
                         batchTotalBytes = totalBytes,
                         cumulativeBytesStart = cumulative,
+                        sessionToken = peer.sessionToken,
                         onSuccess = {
                             recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
                         },

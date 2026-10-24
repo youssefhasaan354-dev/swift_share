@@ -33,17 +33,20 @@ class HighSpeedDataChannel {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var serverJob: Job? = null
     private var isCancelled = false
+    private var activeExpectedToken: String? = null
 
     private val _transferProgress = MutableStateFlow(TransferProgress())
     val transferProgress: StateFlow<TransferProgress> = _transferProgress.asStateFlow()
 
     fun startReceiverServer(
         downloadDir: File = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare"),
+        expectedSessionToken: String? = null,
         onFileReceived: (File, FileManifestItem) -> Unit = { _, _ -> },
         onError: (Throwable) -> Unit = {}
     ) {
         if (!downloadDir.exists()) downloadDir.mkdirs()
         isCancelled = false
+        activeExpectedToken = expectedSessionToken
 
         serverJob = scope.launch {
             var serverChannel: ServerSocketChannel? = null
@@ -54,7 +57,7 @@ class HighSpeedDataChannel {
                     // 1 MB receive buffer for maximum Wi-Fi 5GHz throughput
                     socket().receiveBufferSize = Constants.SOCKET_BUFFER_SIZE
                     socket().soTimeout = Constants.SOCKET_TIMEOUT_MS
-                    socket().bind(InetSocketAddress(Constants.PORT_DATA_NIO))
+                    socket().bind(InetSocketAddress(Constants.PORT_DATA))
                 }
 
                 while (isActive && !isCancelled) {
@@ -84,6 +87,51 @@ class HighSpeedDataChannel {
                 sock.receiveBufferSize = Constants.SOCKET_BUFFER_SIZE
                 sock.tcpNoDelay = true
                 sock.soTimeout = Constants.SOCKET_TIMEOUT_MS
+            }
+
+            // 1. Read first 4 bytes to check for MAGIC_HEADER ("SWFT")
+            val magicBuffer = ByteBuffer.allocate(4)
+            while (magicBuffer.hasRemaining()) {
+                if (socketChannel.read(magicBuffer) == -1) return
+            }
+            magicBuffer.flip()
+            val isMagic = magicBuffer.get() == 'S'.code.toByte() &&
+                    magicBuffer.get() == 'W'.code.toByte() &&
+                    magicBuffer.get() == 'F'.code.toByte() &&
+                    magicBuffer.get() == 'T'.code.toByte()
+
+            if (isMagic) {
+                val tokenLenBuffer = ByteBuffer.allocate(4)
+                while (tokenLenBuffer.hasRemaining()) {
+                    if (socketChannel.read(tokenLenBuffer) == -1) return
+                }
+                tokenLenBuffer.flip()
+                val tokenLen = tokenLenBuffer.int
+                val tokenBytes = ByteArray(tokenLen.coerceIn(0, 512))
+                val tokenBuffer = ByteBuffer.wrap(tokenBytes)
+                while (tokenBuffer.hasRemaining()) {
+                    if (socketChannel.read(tokenBuffer) == -1) return
+                }
+                val receivedToken = String(tokenBytes).trim()
+
+                // Security Check: reject connection before opening any file if token mismatch!
+                val expected = activeExpectedToken
+                if (!expected.isNullOrBlank()) {
+                    val matches = java.security.MessageDigest.isEqual(
+                        expected.toByteArray(Charsets.UTF_8),
+                        receivedToken.toByteArray(Charsets.UTF_8)
+                    )
+                    if (!matches) {
+                        socketChannel.close()
+                        return
+                    }
+                }
+            } else {
+                if (!activeExpectedToken.isNullOrBlank()) {
+                    // Expected token was configured but incoming stream lacks authentication header
+                    socketChannel.close()
+                    return
+                }
             }
 
             // Read header: [fileId (36 bytes)] [offset (8 bytes)] [totalSize (8 bytes)] [nameLength (4 bytes)] [name (N bytes)]
@@ -213,6 +261,7 @@ class HighSpeedDataChannel {
         sourceFile: File,
         batchTotalBytes: Long,
         cumulativeBytesStart: Long,
+        sessionToken: String? = null,
         onSuccess: () -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -231,11 +280,12 @@ class HighSpeedDataChannel {
                         sock.soTimeout = Constants.SOCKET_TIMEOUT_MS
                         sock.keepAlive = true
                     }
-                    connect(InetSocketAddress(targetIp, Constants.PORT_DATA_NIO))
+                    connect(InetSocketAddress(targetIp, Constants.PORT_DATA))
                 }
 
                 val offset = ChunkManager.getResumeOffset(manifestItem.fileId)
                 val nameBytes = manifestItem.name.toByteArray()
+                val tokenBytes = (sessionToken ?: "").toByteArray()
                 val thumbBytes = manifestItem.thumbnailBase64?.let {
                     try {
                         android.util.Base64.decode(it, android.util.Base64.DEFAULT)
@@ -244,9 +294,15 @@ class HighSpeedDataChannel {
                     }
                 } ?: ByteArray(0)
 
-                // Header layout: [fileId (36 bytes)] [offset (8)] [totalSize (8)] [nameLength (4)] [name (N)] [thumbLen (4)] [thumbBytes (M)]
+                // Header layout: MAGIC (4) + tokenLen (4) + tokenBytes + [fileId (36 bytes)] [offset (8)] [totalSize (8)] [nameLength (4)] [name (N)] [thumbLen (4)] [thumbBytes (M)]
                 val paddedId = manifestItem.fileId.take(36).padEnd(36)
-                val headerBuffer = ByteBuffer.allocate(36 + 8 + 8 + 4 + nameBytes.size + 4 + thumbBytes.size).apply {
+                val headerBuffer = ByteBuffer.allocate(4 + 4 + tokenBytes.size + 36 + 8 + 8 + 4 + nameBytes.size + 4 + thumbBytes.size).apply {
+                    put('S'.code.toByte())
+                    put('W'.code.toByte())
+                    put('F'.code.toByte())
+                    put('T'.code.toByte())
+                    putInt(tokenBytes.size)
+                    put(tokenBytes)
                     put(paddedId.toByteArray())
                     putLong(offset)
                     putLong(sourceFile.length())

@@ -99,6 +99,7 @@ class GroupShareEngine(
                     sourceFile = file,
                     batchTotalBytes = file.length(),
                     cumulativeBytesStart = 0L,
+                    sessionToken = targetPeer.sessionToken,
                     onSuccess = {
                         _broadcastStatus.value = "Broadcast of ${file.name} complete!"
                     },
