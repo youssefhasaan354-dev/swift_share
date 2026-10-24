@@ -60,15 +60,19 @@ class PcRemoteServer(
     private val _pptEvents = MutableSharedFlow<RemotePptEvent>(extraBufferCapacity = 64)
     val pptEvents: SharedFlow<RemotePptEvent> = _pptEvents.asSharedFlow()
 
-    fun start(port: Int = Constants.PORT_CONTROL_HTTP, sessionToken: String = NetworkUtils.generateSessionToken()) {
+    fun start(port: Int = Constants.PORT_WEB_PC, sessionToken: String = NetworkUtils.generateSessionToken()) {
         engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(PartialContent)
             install(WebSockets)
             install(CORS) {
-                anyHost()
+                allowMethod(io.ktor.http.HttpMethod.Get)
+                allowMethod(io.ktor.http.HttpMethod.Post)
+                allowMethod(io.ktor.http.HttpMethod.Options)
                 allowHeader(HttpHeaders.ContentType)
                 allowHeader(HttpHeaders.Authorization)
                 allowHeader(HttpHeaders.Range)
+                allowHeader(HttpHeaders.Cookie)
+                allowCredentials = true
             }
 
             routing {
