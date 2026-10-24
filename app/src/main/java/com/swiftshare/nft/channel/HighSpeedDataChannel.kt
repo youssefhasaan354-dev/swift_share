@@ -124,7 +124,12 @@ class HighSpeedDataChannel {
                 android.util.Base64.encodeToString(thumbBuffer.array(), android.util.Base64.NO_WRAP)
             } else null
 
-            val targetFile = File(downloadDir, fileName)
+            val sanitizedName = com.swiftshare.common.SafeFileName.sanitize(fileName)
+            val targetFile = if (offset > 0L) {
+                File(downloadDir, sanitizedName)
+            } else {
+                com.swiftshare.common.SafeFileName.resolveUniqueFile(downloadDir, fileName)
+            }
             val fileOutputStream = FileOutputStream(targetFile, offset > 0)
             val fileChannel = fileOutputStream.channel
 

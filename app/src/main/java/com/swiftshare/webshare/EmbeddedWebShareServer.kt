@@ -202,8 +202,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                     var uploadedCount = 0
                     multipart.forEachPart { part ->
                         if (part is PartData.FileItem) {
-                            val originalName = part.originalFileName ?: "uploaded_file_${System.currentTimeMillis()}"
-                            val destination = File(uploadDir, originalName)
+                            val destination = com.swiftshare.common.SafeFileName.resolveUniqueFile(uploadDir, part.originalFileName)
                             part.streamProvider().use { input ->
                                 destination.outputStream().use { output ->
                                     input.copyTo(output)
