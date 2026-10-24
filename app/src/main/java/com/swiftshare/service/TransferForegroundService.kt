@@ -21,23 +21,31 @@ class TransferForegroundService : Service() {
 
     companion object {
         fun startService(context: Context, fileName: String, totalBytes: Long) {
-            val intent = Intent(context, TransferForegroundService::class.java).apply {
-                action = Constants.ACTION_START_TRANSFER
-                putExtra("file_name", fileName)
-                putExtra("total_bytes", totalBytes)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, TransferForegroundService::class.java).apply {
+                    action = Constants.ACTION_START_TRANSFER
+                    putExtra("file_name", fileName)
+                    putExtra("total_bytes", totalBytes)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TransferService", "Cannot start foreground service (Android 14+ background restriction): ${e.message}")
             }
         }
 
         fun stopService(context: Context) {
-            val intent = Intent(context, TransferForegroundService::class.java).apply {
-                action = Constants.ACTION_CANCEL_TRANSFER
+            try {
+                val intent = Intent(context, TransferForegroundService::class.java).apply {
+                    action = Constants.ACTION_CANCEL_TRANSFER
+                }
+                context.startService(intent)
+            } catch (e: Exception) {
+                android.util.Log.e("TransferService", "Failed to stop service: ${e.message}")
             }
-            context.startService(intent)
         }
     }
 
@@ -56,15 +64,19 @@ class TransferForegroundService : Service() {
                 val totalBytes = intent.getLongExtra("total_bytes", 0L)
                 val notification = buildProgressNotification(fileName, 0, 100, 0)
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                        } else {
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                        }
+                        startForeground(Constants.NOTIFICATION_ID_TRANSFER, notification, serviceType)
                     } else {
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                        startForeground(Constants.NOTIFICATION_ID_TRANSFER, notification)
                     }
-                    startForeground(Constants.NOTIFICATION_ID_TRANSFER, notification, serviceType)
-                } else {
-                    startForeground(Constants.NOTIFICATION_ID_TRANSFER, notification)
+                } catch (e: Exception) {
+                    android.util.Log.e("TransferService", "Failed to startForeground: ${e.message}")
                 }
             }
             Constants.ACTION_CANCEL_TRANSFER -> {

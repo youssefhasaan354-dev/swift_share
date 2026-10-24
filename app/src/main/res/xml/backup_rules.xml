@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
+    <!-- Exclude hardware-backed AES-256 encrypted SafeBox vault from device backups -->
+    <exclude domain="file" path="vault" />
+    <exclude domain="file" path="vault/" />
     <exclude domain="database" path="safebox.db" />
 </full-backup-content>

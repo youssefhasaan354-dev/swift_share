@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- By default disallow cleartext traffic to the public internet -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Permit cleartext HTTP communication only for local loopback, emulator, and private LAN ranges -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Standard Android Wi-Fi Direct Group Owner IP -->
+        <domain includeSubdomains="true">192.168.49.1</domain>
+        <!-- Standard Android Local Hotspot Default Gateway -->
+        <domain includeSubdomains="true">192.168.43.1</domain>
+    </domain-config>
+</network-security-config>

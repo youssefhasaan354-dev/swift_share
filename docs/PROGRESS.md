@@ -64,9 +64,20 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
   - `app/build.gradle.kts`
   - `app/proguard-rules.pro`
   - `key.properties.example`
-- **Commit**: *(pending T1.5 commit)*
+- **Commit**: `07aff2d`
+
+### T1.6: Manifest Hardening & Android 14+ Service Rules
+- **Status**: DONE
+- **Verification**: Built and verified `./gradlew.bat testDebugUnitTest` and `assembleDebug`. Verified `android.hardware.wifi.direct` marked `required="false"`. `network_security_config.xml` configured to block cleartext to public Internet and allow only loopback and private LAN endpoints. SafeBox encrypted vault (`files/vault/`) excluded from `backup_rules.xml` and `data_extraction_rules.xml`. `TransferForegroundService` updated with `connectedDevice | dataSync` types and safe Android 14+ background start exception handling.
+- **Files Touched**:
+  - `app/src/main/AndroidManifest.xml`
+  - `app/src/main/res/xml/network_security_config.xml`
+  - `app/src/main/res/xml/backup_rules.xml`
+  - `app/src/main/res/xml/data_extraction_rules.xml`
+  - `app/src/main/java/com/swiftshare/service/TransferForegroundService.kt`
+- **Commit**: *(pending T1.6 commit)*
 
 ---
 
 ## Next Task
-- **NEXT**: T1.6 (Manifest & configuration: `android.hardware.wifi.direct` required="false", `network_security_config` permitting cleartext only for private LAN ranges, exclude SafeBox storage from backup and data-extraction rules, correct `foregroundServiceType` and start rules for Android 14+).
+- **NEXT**: T1.7 (Network unbind: after a transfer ends or is cancelled call `bindProcessToNetwork(null)` and `unregisterNetworkCallback`).
