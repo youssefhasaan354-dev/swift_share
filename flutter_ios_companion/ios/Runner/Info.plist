@@ -43,17 +43,7 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
-					<key>NSLocalNetworkUsageDescription</key>
-	<string>SwiftShare requires local network access to discover nearby devices.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_swiftshare._tcp</string>
-	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
-</dict>
+				</dict>
 			</array>
 		</dict>
 	</dict>
@@ -76,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>SwiftShare requires local network access to discover nearby devices.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_swiftshare._tcp</string>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>
