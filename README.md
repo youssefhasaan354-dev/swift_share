@@ -94,3 +94,13 @@ d:\share\
 - **Zero Bloatware / Zero Adware:** Excluded all third-party ad networks, push tracking SDKs, accessibility-abuse auto-clickers, and shortcut injectors.
 - **Cryptographic Session Security:** Generates ephemeral UUID session tokens verified on all control and transfer socket endpoints.
 - **Scoped Android 10–15+ Permissions:** Explicitly handles `NEARBY_WIFI_DEVICES` (`neverForLocation`), `BLUETOOTH_SCAN`/`CONNECT`, and Android 13+ granular media permissions.
+
+---
+
+## ⚠️ حالة التحقق والاختبار الميداني (Validation & Field Testing Status)
+
+> [!IMPORTANT]
+> **إقرار تقني صريح بحالة الجاهزية والاختبار:**
+> 1. **تطبيق iOS لم يُبنَ على Xcode ولم يُجرَّب على جهاز حقيقي:** نظراً لأن بيئة التطوير الحالية مبنية بالكامل على نظام Windows، لا يمكن تقنياً بناء حزم `.ipa` أو تشغيل المحاكي الخاص بـ iOS من بيئة Windows دون جهاز Mac.
+> 2. **اكتشاف Bonjour والنقل الفعلي بين Android و iPhone غير مختبرين ميدانياً:** كود دارت/فلاتر مجاز استاتيكياً بنسبة 100% بدون أي أخطاء (`flutter analyze` و `flutter test` ناجحان تماماً)، لكن عملية اكتشاف خدمة Bonjour (`_swiftshare._tcp`) وتدفق النقل المباشر عبر السوكت الفعلي بين هاتف أندرويد وهاتف آيفون حقيقيين تتطلب التحقق الميداني الموثق في [docs/IOS_BUILD_AND_FIELD_TEST.md](docs/IOS_BUILD_AND_FIELD_TEST.md) على جهاز Mac.
+> 3. **فحص مسارات الويب:** سكريبت التحقق `scripts/test_portal_routes.js` يفحص أصول الويب الثابتة وقوالب HTML والوسوم ومطابقة دوال الكوتلن، **ولا يثبت صحة نقل البيانات أو اتصالات السوكت الحقيقية بين الأجهزة**.
