@@ -54,9 +54,19 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
   - `app/src/main/java/com/swiftshare/groupshare/GroupShareEngine.kt`
   - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
   - `app/src/test/java/com/swiftshare/nft/channel/DataChannelTokenTest.kt`
-- **Commit**: *(pending T1.4 commit)*
+- **Commit**: `4a7e05a`
+
+### T1.5: Release Signing Security & R8 Optimization
+- **Status**: DONE
+- **Verification**: Built and verified `./gradlew.bat assembleRelease` which ran R8 code minification (`minifyReleaseWithR8`), resource shrinking (`shrinkReleaseRes`), and packaged release APK (`app/build/outputs/apk/release/app-release.apk`, 27.4 MB). Hardcoded passwords removed from `build.gradle.kts`. Signing now reads from `key.properties` or environment variables (`SWIFTSHARE_*`) with automatic fallback to debug signing if not configured. Template added at `key.properties.example`.
+- **Note**: The legacy password `swiftshare123` exists in git history and must be rotated for production distribution.
+- **Files Touched**:
+  - `app/build.gradle.kts`
+  - `app/proguard-rules.pro`
+  - `key.properties.example`
+- **Commit**: *(pending T1.5 commit)*
 
 ---
 
 ## Next Task
-- **NEXT**: T1.5 (Release signing from `key.properties` / env vars with debug-signing fallback; remove hardcoded passwords from `build.gradle.kts`; enable R8 with keep rules; verify `assembleRelease`).
+- **NEXT**: T1.6 (Manifest & configuration: `android.hardware.wifi.direct` required="false", `network_security_config` permitting cleartext only for private LAN ranges, exclude SafeBox storage from backup and data-extraction rules, correct `foregroundServiceType` and start rules for Android 14+).

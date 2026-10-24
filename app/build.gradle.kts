@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -23,22 +25,55 @@ android {
         }
     }
 
+    val keyPropertiesFile = rootProject.file("key.properties").takeIf { it.exists() }
+        ?: project.file("key.properties").takeIf { it.exists() }
+    val keyProperties = Properties().apply {
+        if (keyPropertiesFile != null && keyPropertiesFile.exists()) {
+            keyPropertiesFile.inputStream().use { inputStream ->
+                load(inputStream)
+            }
+        }
+    }
+
+    val releaseStoreFilePath = keyProperties.getProperty("storeFile")
+        ?: System.getenv("SWIFTSHARE_STORE_FILE")
+    val releaseStorePassword = keyProperties.getProperty("storePassword")
+        ?: System.getenv("SWIFTSHARE_STORE_PASSWORD")
+    val releaseKeyAlias = keyProperties.getProperty("keyAlias")
+        ?: System.getenv("SWIFTSHARE_KEY_ALIAS")
+    val releaseKeyPassword = keyProperties.getProperty("keyPassword")
+        ?: System.getenv("SWIFTSHARE_KEY_PASSWORD")
+
+    val hasReleaseConfig = !releaseStoreFilePath.isNullOrBlank() &&
+            !releaseStorePassword.isNullOrBlank() &&
+            !releaseKeyAlias.isNullOrBlank() &&
+            !releaseKeyPassword.isNullOrBlank() &&
+            (file(releaseStoreFilePath).exists() || rootProject.file(releaseStoreFilePath).exists())
+
     signingConfigs {
-        create("release") {
-            storeFile = file("swiftshare-release.jks")
-            storePassword = "swiftshare123"
-            keyAlias = "swiftshare"
-            keyPassword = "swiftshare123"
-            enableV1Signing = true
-            enableV2Signing = true
+        if (hasReleaseConfig) {
+            create("release") {
+                val store = file(releaseStoreFilePath!!).takeIf { it.exists() }
+                    ?: rootProject.file(releaseStoreFilePath)
+                storeFile = store
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
-            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = if (hasReleaseConfig) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -1,0 +1,7 @@
+# SwiftShare Release Signing Template
+# Copy this file to 'key.properties' and fill in your actual production keystore details.
+# DO NOT commit 'key.properties' to source control.
+storeFile=swiftshare-release.jks
+storePassword=your_store_password_here
+keyAlias=your_key_alias_here
+keyPassword=your_key_password_here
