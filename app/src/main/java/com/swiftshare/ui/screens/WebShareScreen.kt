@@ -56,7 +56,7 @@ fun WebShareScreen(
     val webServer = remember { EmbeddedWebShareServer(context) }
     val sessionToken by webServer.activeSessionToken.collectAsState()
     val localIp = remember { NetworkUtils.getLocalIpAddress(context) }
-    val webUrl = "http://$localIp:${Constants.PORT_CONTROL_HTTP}/webshare?token=$sessionToken"
+    val webUrl = "http://$localIp:${Constants.PORT_WEB_PC}/webshare?token=$sessionToken"
 
     LaunchedEffect(Unit) {
         webServer.start()

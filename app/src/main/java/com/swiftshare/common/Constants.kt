@@ -1,9 +1,14 @@
 package com.swiftshare.common
 
 object Constants {
-    const val PORT_CONTROL_HTTP = 2999
-    const val PORT_DATA_NIO = 2998
+    const val PORT_CONTROL = 2999
+    const val PORT_DATA = 2998
+    const val PORT_WEB_PC = 8080
     const val PORT_UDP_BROADCAST = 55283
+
+    // Compatibility aliases
+    const val PORT_CONTROL_HTTP = PORT_CONTROL
+    const val PORT_DATA_NIO = PORT_DATA
 
     const val NSD_SERVICE_TYPE = "_swiftshare._tcp."
     const val NSD_SERVICE_NAME = "SwiftShareNode"

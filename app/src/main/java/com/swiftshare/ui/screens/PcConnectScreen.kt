@@ -57,7 +57,7 @@ fun PcConnectScreen(
     val pcServer = remember { PcRemoteServer(context, mediaRepo) }
     val token = remember { NetworkUtils.generateSessionToken() }
     val localIp = remember { NetworkUtils.getLocalIpAddress(context) }
-    val pcUrl = "http://$localIp:${Constants.PORT_CONTROL_HTTP}/pc?token=$token"
+    val pcUrl = "http://$localIp:${Constants.PORT_WEB_PC}/pc?token=$token"
 
     val events = remember { mutableStateListOf<String>() }
 

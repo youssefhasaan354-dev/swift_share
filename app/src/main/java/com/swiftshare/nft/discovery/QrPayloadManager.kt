@@ -88,7 +88,7 @@ object QrPayloadManager {
                     ssid = ssid,
                     preSharedKey = pass,
                     ip = "192.168.49.1",
-                    port = com.swiftshare.common.Constants.PORT_CONTROL_HTTP,
+                    port = com.swiftshare.common.Constants.PORT_CONTROL,
                     sessionToken = "WIFI_QR",
                     deviceName = ssid
                 )
@@ -100,7 +100,7 @@ object QrPayloadManager {
             try {
                 val uri = android.net.Uri.parse(trimmed)
                 val host = uri.host ?: ""
-                val port = if (uri.port != -1) uri.port else com.swiftshare.common.Constants.PORT_CONTROL_HTTP
+                val port = if (uri.port != -1) uri.port else com.swiftshare.common.Constants.PORT_WEB_PC
                 if (host.isNotBlank()) {
                     return com.swiftshare.nft.discovery.models.ConnectionPayload(
                         ssid = "LAN-WIFI",

@@ -63,8 +63,8 @@ class DeviceDiscoveryManager(private val context: Context) {
         val isOnLan = validLanIp != null
 
         // ── Step 1: Always advertise on Same-LAN (NSD + UDP 55283) concurrently
-        scope.launch { nsdManager.registerService(Constants.PORT_CONTROL_HTTP, deviceName) }
-        scope.launch { nsdManager.startUdpBroadcasting(deviceName, Constants.PORT_CONTROL_HTTP, sessionToken) }
+        scope.launch { nsdManager.registerService(Constants.PORT_CONTROL, deviceName) }
+        scope.launch { nsdManager.startUdpBroadcasting(deviceName, Constants.PORT_CONTROL, sessionToken) }
         scope.launch { bleManager.startAdvertising(deviceName, sessionToken) }
 
         // ── Step 2: Attempt Wi-Fi Direct Group / LocalOnlyHotspot concurrently
@@ -76,7 +76,7 @@ class DeviceDiscoveryManager(private val context: Context) {
                     ssid = ssid,
                     preSharedKey = pass,
                     ip = "192.168.49.1",
-                    port = Constants.PORT_CONTROL_HTTP,
+                    port = Constants.PORT_CONTROL,
                     sessionToken = sessionToken,
                     deviceName = deviceName,
                     avatarId = avatarId,
@@ -93,7 +93,7 @@ class DeviceDiscoveryManager(private val context: Context) {
                             ssid = config.ssid,
                             preSharedKey = config.preSharedKey,
                             ip = config.ip,
-                            port = Constants.PORT_CONTROL_HTTP,
+                            port = Constants.PORT_CONTROL,
                             sessionToken = sessionToken,
                             deviceName = deviceName,
                             avatarId = avatarId,
@@ -109,7 +109,7 @@ class DeviceDiscoveryManager(private val context: Context) {
                             ssid = "LAN-WIFI",
                             preSharedKey = "",
                             ip = fallbackIp,
-                            port = Constants.PORT_CONTROL_HTTP,
+                            port = Constants.PORT_CONTROL,
                             sessionToken = sessionToken,
                             deviceName = deviceName,
                             avatarId = avatarId,
