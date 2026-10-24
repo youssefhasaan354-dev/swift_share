@@ -1,0 +1,26 @@
+name: swiftshare_ios_client
+description: SwiftShare iOS/cross-platform Flutter companion — discovers _swiftshare._tcp via Bonjour/mDNS and speaks port 2999 JSON control + port 2998 binary stream protocol.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.1
+  multicast_dns: ^0.3.2+2
+  file_picker: ^8.1.2
+  open_file: ^3.3.2
+  path_provider: ^2.1.3
+  permission_handler: ^11.3.1
+  share_plus: ^10.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

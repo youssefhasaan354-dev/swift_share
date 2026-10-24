@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SwiftShare PC Suite</title>
+  <style>
+    :root {
+      --primary: #0066FF;
+      --primary-hover: #0052CC;
+      --accent: #00E5FF;
+      --bg: #0A0E1A;
+      --sidebar-bg: #111827;
+      --surface: #1E293B;
+      --surface-border: #334155;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+      --danger: #EF4444;
+      --laser: #FF0055;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+    
+    /* Sidebar */
+    aside { width: 260px; background-color: var(--sidebar-bg); border-right: 1px solid var(--surface-border); display: flex; flex-direction: column; }
+    .brand { padding: 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--surface-border); }
+    .brand-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--accent)); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+    .brand-text { font-size: 1.15rem; font-weight: 700; color: #FFF; }
+    .nav-menu { list-style: none; padding: 1rem 0.75rem; flex: 1; display: flex; flex-direction: column; gap: 0.35rem; }
+    .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; cursor: pointer; color: var(--text-muted); font-weight: 500; transition: all 0.2s; }
+    .nav-item:hover, .nav-item.active { background-color: rgba(0, 102, 255, 0.15); color: #FFF; }
+    .nav-item.active { color: var(--accent); border-left: 3px solid var(--accent); }
+    .device-info { padding: 1rem; margin: 1rem; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius); font-size: 0.85rem; }
+    .device-name { font-weight: 600; color: #FFF; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
+    .device-status { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+    /* Main Content */
+    main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background-color: var(--bg); }
+    header { height: 65px; border-bottom: 1px solid var(--surface-border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; background: rgba(17, 24, 39, 0.8); backdrop-filter: blur(10px); }
+    .page-title { font-size: 1.25rem; font-weight: 600; }
+    .actions { display: flex; gap: 0.75rem; align-items: center; }
+    .content-area { padding: 2rem; flex: 1; }
+
+    /* Buttons & Cards */
+    .btn { background: var(--primary); color: white; border: none; padding: 0.55rem 1.1rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; font-size: 0.875rem; }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--surface-border); }
+    .btn-secondary:hover { background: var(--surface-border); }
+
+    /* Views */
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* Remote View Grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.25rem; }
+    .media-card { background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+    .media-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); border-color: var(--primary); }
+    .media-thumb { width: 100%; height: 120px; object-fit: cover; background: #000; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; }
+    .media-info { padding: 0.75rem; }
+    .media-name { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.25rem; }
+    .media-meta { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* PPT Remote & PlayTo View */
+    .remote-container { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 650px; margin: 2rem auto; text-align: center; }
+    .ppt-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; margin-top: 2rem; }
+    .ppt-btn { padding: 2.5rem 1rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--surface-border); color: #FFF; font-size: 1.25rem; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .ppt-btn:hover { background: var(--primary); border-color: var(--primary); transform: scale(1.02); }
+    .ppt-btn:active { transform: scale(0.98); }
+
+    /* Laser Pointer Canvas */
+    .laser-pad { width: 100%; height: 280px; background: rgba(0,0,0,0.5); border: 2px dashed var(--surface-border); border-radius: var(--radius); margin-top: 1.5rem; position: relative; cursor: crosshair; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    .laser-point { width: 14px; height: 14px; background: var(--laser); border-radius: 50%; position: absolute; pointer-events: none; transform: translate(-50%, -50%); box-shadow: 0 0 15px var(--laser), 0 0 30px var(--laser); display: none; }
+
+    /* Dropzone */
+    .dropzone { border: 2px dashed var(--surface-border); border-radius: var(--radius); padding: 3rem 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s ease; background: rgba(0, 102, 255, 0.03); margin-bottom: 2rem; }
+    .dropzone.dragover { border-color: var(--accent); background: rgba(0, 229, 255, 0.08); }
+
+    /* PlayTo Player */
+    .playto-player { width: 100%; max-width: 800px; height: 450px; background: #000; border-radius: var(--radius); overflow: hidden; margin: 0 auto; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }
+    video { width: 100%; height: 100%; object-fit: contain; }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-text">SwiftShare PC</div>
+    </div>
+    <ul class="nav-menu">
+      <li class="nav-item active" onclick="switchTab('transfer')">📁 File Transfer</li>
+      <li class="nav-item" onclick="switchTab('remoteview')">🖼️ Remote View</li>
+      <li class="nav-item" onclick="switchTab('playto')">📺 PlayTo Cast</li>
+      <li class="nav-item" onclick="switchTab('ppt')">📽️ PPT Remote</li>
+    </ul>
+    <div class="device-info">
+      <div class="device-name"><span class="device-status"></span> <span id="phoneName">Pixel 9 Pro</span></div>
+      <div style="color: var(--text-muted); font-size: 0.75rem;" id="phoneStorage">Storage: Checking...</div>
+    </div>
+  </aside>
+
+  <!-- Main View -->
+  <main>
+    <header>
+      <div class="page-title" id="pageTitle">File Transfer & Management</div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="refreshCurrentTab()">🔄 Refresh</button>
+        <button class="btn" onclick="document.getElementById('fileInput').click()">📤 Upload to Phone</button>
+        <input type="file" id="fileInput" multiple style="display: none;" onchange="handleUpload(this.files)">
+      </div>
+    </header>
+
+    <div class="content-area">
+      <!-- 1. Transfer Tab -->
+      <section id="tab-transfer" class="view-panel active">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📥</div>
+          <h3>Drag and drop files to upload to phone</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">Direct high-speed P2P socket channel (up to 80 MB/s)</p>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.1rem;">Phone Shared Files</h3>
+          <a class="btn btn-secondary" href="/api/download/all" target="_blank">📦 Batch Download All</a>
+        </div>
+        <div class="grid" id="transferFileList">
+          <!-- Files inserted dynamically -->
+        </div>
+      </section>
+
+      <!-- 2. Remote View Tab -->
+      <section id="tab-remoteview" class="view-panel">
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem;">
+          <button class="btn btn-secondary active" onclick="loadRemoteCategory('photos')">Photos</button>
+          <button class="btn btn-secondary" onclick="loadRemoteCategory('videos')">Videos</button>
+          <button class="btn btn-secondary" onclick="loadRemoteCategory('music')">Music</button>
+          <button class="btn btn-secondary" onclick="loadRemoteCategory('apps')">Apps</button>
+          <button class="btn btn-secondary" onclick="loadRemoteCategory('docs')">Documents</button>
+        </div>
+        <div class="grid" id="remoteViewGrid">
+          <!-- Media items inserted dynamically -->
+        </div>
+      </section>
+
+      <!-- 3. PlayTo Cast Tab -->
+      <section id="tab-playto" class="view-panel">
+        <div class="remote-container">
+          <h2>📺 PlayTo Screen Mirror & Stream</h2>
+          <p style="color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 1.5rem;">Stream video and audio directly from your phone to this browser in real-time.</p>
+          <div class="playto-player">
+            <video id="castVideo" controls autoplay></video>
+          </div>
+          <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button class="btn" onclick="document.getElementById('castVideo').requestFullscreen()">⛶ Fullscreen</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('castVideo').pause()">⏸ Pause</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. PPT Remote Tab -->
+      <section id="tab-ppt" class="view-panel">
+        <div class="remote-container">
+          <h2>📽️ Presentation Controller (PPT Remote)</h2>
+          <p style="color: var(--text-muted); margin-top: 0.5rem;">Control desktop presentation software or test the remote control signals below.</p>
+          <div class="ppt-buttons">
+            <button class="ppt-btn" onclick="sendPptAction('PREV_SLIDE')">
+              <span>⬅️</span>
+              <span>Previous Slide</span>
+            </button>
+            <button class="ppt-btn" onclick="sendPptAction('NEXT_SLIDE')">
+              <span>➡️</span>
+              <span>Next Slide</span>
+            </button>
+            <button class="ppt-btn" onclick="sendPptAction('BLANK_SCREEN')">
+              <span>⬛</span>
+              <span>Blank Screen</span>
+            </button>
+            <button class="ppt-btn" onclick="sendPptAction('FULLSCREEN')">
+              <span>⛶</span>
+              <span>Toggle Fullscreen</span>
+            </button>
+          </div>
+
+          <h3 style="margin-top: 2rem; font-size: 1rem;">Virtual Laser Pointer Touchpad</h3>
+          <div class="laser-pad" id="laserPad">
+            Touch / Drag here to point laser on screen
+            <div class="laser-point" id="laserPoint"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const sessionToken = new URLSearchParams(window.location.search).get('token') || '';
+    let pptWs = null;
+
+    function initWebSocket() {
+      const loc = window.location;
+      const wsUri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + '/api/ppt/ws?token=' + encodeURIComponent(sessionToken);
+      try {
+        pptWs = new WebSocket(wsUri);
+        pptWs.onopen = () => console.log('PPT WebSocket connected');
+        pptWs.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'PLAYTO_STREAM') {
+              playMediaStream(msg.streamUrl);
+            }
+          } catch(err) {}
+        };
+      } catch(e) {
+        console.warn('WebSocket connection not available');
+      }
+    }
+    initWebSocket();
+
+    function switchTab(tab) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(el => el.classList.remove('active'));
+      
+      const targetPanel = document.getElementById('tab-' + tab);
+      if (targetPanel) targetPanel.classList.add('active');
+      
+      const tabNames = {
+        transfer: 'File Transfer & Management',
+        remoteview: 'Remote View - Phone Storage',
+        playto: 'PlayTo - Media Stream Casting',
+        ppt: 'PPT Remote Controller'
+      };
+      document.getElementById('pageTitle').textContent = tabNames[tab] || 'SwiftShare PC Suite';
+      
+      if (tab === 'transfer') loadTransferFiles();
+      if (tab === 'remoteview') loadRemoteCategory('photos');
+    }
+
+    async function loadTransferFiles() {
+      try {
+        const res = await fetch('/api/manifest?token=' + encodeURIComponent(sessionToken));
+        const data = await res.json();
+        if (data.deviceName) document.getElementById('phoneName').textContent = data.deviceName;
+        if (data.freeSpace) document.getElementById('phoneStorage').textContent = 'Storage: ' + formatBytes(data.freeSpace) + ' free';
+
+        const container = document.getElementById('transferFileList');
+        if (!data.files || data.files.length === 0) {
+          container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2rem;">No files queued on phone.</div>';
+          return;
+        }
+        container.innerHTML = data.files.map(f => `
+          <div class="media-card">
+            <div class="media-thumb">${getFileEmoji(f.name)}</div>
+            <div class="media-info">
+              <div class="media-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+              <div class="media-meta">${formatBytes(f.size)}</div>
+              <a class="btn" style="margin-top: 0.5rem; width: 100%; justify-content: center;" href="/api/download/${f.fileId}?token=${encodeURIComponent(sessionToken)}" download="${escapeHtml(f.name)}">Download</a>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadRemoteCategory(category) {
+      const grid = document.getElementById('remoteViewGrid');
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Fetching ' + category + '...</div>';
+      try {
+        const res = await fetch('/api/remote/files?category=' + category + '&token=' + encodeURIComponent(sessionToken));
+        const items = await res.json();
+        if (!items || items.length === 0) {
+          grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No items found in ' + category + '.</div>';
+          return;
+        }
+        grid.innerHTML = items.map(item => `
+          <div class="media-card" onclick="openRemoteItem('${item.id}', '${item.type}', '${encodeURIComponent(item.name)}')">
+            <div class="media-thumb">
+              ${item.thumbnail ? `<img src="${item.thumbnail}" style="width: 100%; height: 100%; object-fit: cover;">` : getFileEmoji(item.name)}
+            </div>
+            <div class="media-info">
+              <div class="media-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+              <div class="media-meta">${formatBytes(item.size)}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch(e) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--danger);">Failed to load remote files.</div>';
+      }
+    }
+
+    function openRemoteItem(id, type, name) {
+      if (type === 'video' || type === 'music') {
+        switchTab('playto');
+        playMediaStream('/api/remote/stream/' + id + '?token=' + encodeURIComponent(sessionToken));
+      } else {
+        window.open('/api/remote/download/' + id + '?token=' + encodeURIComponent(sessionToken), '_blank');
+      }
+    }
+
+    function playMediaStream(url) {
+      const vid = document.getElementById('castVideo');
+      vid.src = url;
+      vid.play();
+    }
+
+    function sendPptAction(action) {
+      if (pptWs && pptWs.readyState === WebSocket.OPEN) {
+        pptWs.send(JSON.stringify({ type: 'PPT_COMMAND', action: action }));
+      } else {
+        fetch('/api/ppt/control', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action, token: sessionToken })
+        });
+      }
+    }
+
+    // Virtual Laser Pad
+    const laserPad = document.getElementById('laserPad');
+    const laserPoint = document.getElementById('laserPoint');
+    function updateLaser(e) {
+      const rect = laserPad.getBoundingClientRect();
+      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      const y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+      laserPoint.style.display = 'block';
+      laserPoint.style.left = x + 'px';
+      laserPoint.style.top = y + 'px';
+      
+      const normX = x / rect.width;
+      const normY = y / rect.height;
+      if (pptWs && pptWs.readyState === WebSocket.OPEN) {
+        pptWs.send(JSON.stringify({ type: 'LASER_MOVE', x: normX, y: normY }));
+      }
+    }
+    laserPad.addEventListener('mousemove', updateLaser);
+    laserPad.addEventListener('mouseleave', () => { laserPoint.style.display = 'none'; });
+
+    // File Drag & Drop
+    const dropzone = document.getElementById('dropzone');
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+    });
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files) {
+        handleUpload(e.dataTransfer.files);
+      }
+    });
+
+    async function handleUpload(files) {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        formData.append('token', sessionToken);
+        await fetch('/api/upload', { method: 'POST', body: formData });
+      }
+      loadTransferFiles();
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getFileEmoji(name) {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return '🖼️';
+      if (['mp4', 'mkv', 'mov'].includes(ext)) return '🎬';
+      if (['mp3', 'flac', 'm4a'].includes(ext)) return '🎵';
+      if (['apk', 'xapk'].includes(ext)) return '📦';
+      if (['pdf', 'doc', 'docx', 'txt'].includes(ext)) return '📄';
+      return '📁';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function refreshCurrentTab() {
+      loadTransferFiles();
+    }
+
+    loadTransferFiles();
+  </script>
+</body>
+</html>

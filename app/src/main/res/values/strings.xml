@@ -1,0 +1,96 @@
+<resources>
+    <string name="app_name">SwiftShare</string>
+    <string name="send">Send</string>
+    <string name="receive">Receive</string>
+    <string name="web_share">WebShare</string>
+    <string name="connect_pc">Connect to PC</string>
+    <string name="group_share">Group Share</string>
+    <string name="phone_clone">Phone Clone</string>
+    <string name="safebox">SafeBox Vault</string>
+    <string name="file_explorer">File Explorer</string>
+    <string name="media_player">Media Player</string>
+    <string name="transfer_in_progress">SwiftShare Transfer Active</string>
+    <string name="connect_ios">Connect to iPhone / iOS</string>
+    <string name="ios_qr_hint">Scan QR to join Wi-Fi, then open Safari</string>
+    <string name="send_subtitle">Select &amp; Transfer</string>
+    <string name="receive_subtitle">Hotspot / QR Mode</string>
+    <string name="smart_utilities">Smart Utilities</string>
+    <string name="select_files">Select Files to Send</string>
+    <string name="transfer_completed">Transfer Completed</string>
+    <string name="transferring_files">Transferring Files</string>
+    <string name="cancel_transfer">Cancel Transfer</string>
+    <string name="done">Done</string>
+    <string name="clean_now">Clean Now</string>
+    <string name="storage_cleaned">Storage Cleaned!</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_transfer">Transfer</string>
+    <string name="nav_files">Files &amp; Apps</string>
+    <string name="nav_media">Media Hub</string>
+    <string name="nav_history">History &amp; Me</string>
+
+    <!-- Tabs & Categories -->
+    <string name="tab_apps">Apps</string>
+    <string name="tab_photos">Photos</string>
+    <string name="tab_videos">Videos</string>
+    <string name="tab_music">Music</string>
+    <string name="tab_docs">Docs</string>
+    <string name="tab_folders">Folders</string>
+
+    <!-- Search & Selection -->
+    <string name="search_hint">Search apps, photos, videos, files…</string>
+    <string name="select_all">Select All</string>
+    <string name="deselect_all">Deselect All</string>
+    <string name="selected_count">%1$d selected (%2$s)</string>
+    <string name="send_selected">Send Selected (%1$d)</string>
+
+    <!-- SafeBox Screen -->
+    <string name="safebox_title">SafeBox Vault (AES-256-GCM)</string>
+    <string name="safebox_locked_title">Encrypted SafeBox Vault</string>
+    <string name="safebox_locked_subtitle">Hardware-backed AndroidKeyStore master key</string>
+    <string name="safebox_enter_pin">Enter Vault PIN</string>
+    <string name="safebox_set_pin">Set 4-Digit Master PIN</string>
+    <string name="safebox_confirm_pin">Confirm Master PIN</string>
+    <string name="safebox_unlock_btn">Unlock Vault</string>
+    <string name="safebox_biometric_btn">Fingerprint / Biometric</string>
+    <string name="safebox_encrypt_file">+ Encrypt File</string>
+    <string name="safebox_empty">Vault is empty. Encrypted files are hidden from MediaStore.</string>
+    <string name="safebox_restore">Restore</string>
+    <string name="safebox_preview">Preview</string>
+
+    <!-- Group Share Screen -->
+    <string name="group_title">Group Share Portal</string>
+    <string name="group_create_room">Create Room (Host)</string>
+    <string name="group_join_room">Join Room (Member)</string>
+    <string name="group_desc">Create a room for up to 8 peers. Any file shared in the room is multicast to all members.</string>
+    <string name="group_broadcast_btn">Broadcast File to All Members</string>
+    <string name="group_members">Room Members</string>
+    <string name="group_leave">Leave</string>
+
+    <!-- Phone Clone Screen -->
+    <string name="clone_title">Phone Clone Migration</string>
+    <string name="clone_old_phone">Old Phone (Send)</string>
+    <string name="clone_new_phone">New Phone (Receive)</string>
+    <string name="clone_start">Start Migration</string>
+    <string name="clone_migrating">Migrating data to new device…</string>
+    <string name="clone_complete">Phone Migration Complete!</string>
+    <string name="clone_contacts">Contacts</string>
+    <string name="clone_call_logs">Call Logs</string>
+
+    <!-- Settings & Profile -->
+    <string name="settings_device_name">Device Name &amp; Avatar</string>
+    <string name="settings_language">Language</string>
+    <string name="language_toggle">العربية</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Radar & QR -->
+    <string name="radar_searching">Searching for Peers</string>
+    <string name="radar_waiting">Waiting to Receive</string>
+    <string name="radar_scan_qr">📷 Scan QR</string>
+    <string name="radar_radar_view">Radar View</string>
+    <string name="radar_show_qr">Show QR</string>
+    <string name="qr_tab_app">App QR</string>
+    <string name="qr_tab_wifi">Wi-Fi QR</string>
+    <string name="qr_tab_web">WebShare URL</string>
+</resources>

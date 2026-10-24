@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SwiftShare">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#090D16">
+  <meta name="description" content="SwiftShare — High-speed offline file transfer. No data usage, no cloud. Works on iPhone, iPad, Android, and PC.">
+  <title>SwiftShare WebShare</title>
+  <style>
+    :root {
+      --primary: #1A4FFF;
+      --primary-dark: #0033CC;
+      --accent: #00E5FF;
+      --emerald: #10B981;
+      --bg: #090D16;
+      --surface: #131B2E;
+      --surface-card: #1E293B;
+      --surface-border: #23314E;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+      --danger: #EF4444;
+      --amber: #F59E0B;
+      --radius: 16px;
+      --glass: rgba(19, 27, 46, 0.75);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+
+    /* ── Background gradient blobs ── */
+    body::before { content: ''; position: fixed; top: -100px; left: -80px; width: 350px; height: 350px; border-radius: 50%; background: radial-gradient(circle, rgba(26,79,255,0.15) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+    body::after { content: ''; position: fixed; bottom: -60px; right: -80px; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(0,229,255,0.1) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+
+    /* ── Header ── */
+    header { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--surface-border); padding: 1rem 1.5rem; padding-top: calc(1rem + env(safe-area-inset-top)); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    .logo-container { display: flex; align-items: center; gap: 0.65rem; }
+    .logo-badge { width: 38px; height: 38px; border-radius: 11px; background: linear-gradient(135deg, var(--primary), var(--accent)); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: 0 4px 15px rgba(26,79,255,0.4); }
+    .logo-title { font-size: 1.15rem; font-weight: 700; background: linear-gradient(90deg, #fff, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .ios-badge { display: flex; align-items: center; gap: 0.4rem; background: var(--surface); border: 1px solid var(--surface-border); padding: 0.35rem 0.9rem; border-radius: 999px; font-size: 0.8rem; color: var(--text-muted); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* ── iOS Add to Home screen banner ── */
+    #ios-add-banner { display: none; background: linear-gradient(135deg, #1C1C1E, #2C2C2E); border: 1px solid #3A3A3C; border-radius: 14px; margin: 1rem 1.5rem 0; padding: 0.9rem 1rem; font-size: 0.82rem; color: #EBEBF5; line-height: 1.5; position: relative; z-index: 10; }
+    #ios-add-banner strong { color: #FFFFFF; }
+    #ios-add-banner .ios-share-icon { display: inline-block; width: 18px; height: 18px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2307AFF9'%3E%3Cpath d='M12 2L8 6h3v8h2V6h3L12 2zm-7 14v4h14v-4h-2v2H7v-2H5z'/%3E%3C/svg%3E") center/contain no-repeat; vertical-align: middle; }
+    @media (display-mode: standalone) { #ios-add-banner { display: none !important; } }
+
+    /* ── Main layout ── */
+    main { flex: 1; max-width: 900px; width: 100%; margin: 0 auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; position: relative; z-index: 1; }
+    .card { background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius); padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.35); position: relative; overflow: hidden; }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,229,255,0.3), transparent); }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem; }
+    .card-title { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+
+    /* ── Dropzone ── */
+    .dropzone { border: 2px dashed var(--surface-border); border-radius: var(--radius); padding: 2.25rem 1.25rem; text-align: center; cursor: pointer; transition: all 0.25s ease; background: rgba(26,79,255,0.03); user-select: none; }
+    .dropzone.dragover { border-color: var(--accent); background: rgba(0,229,255,0.07); transform: scale(1.01); }
+    .dropzone-icon { font-size: 2.75rem; margin-bottom: 0.6rem; }
+    .dropzone-text { font-weight: 600; margin-bottom: 0.3rem; }
+    .dropzone-hint { color: var(--text-muted); font-size: 0.82rem; }
+
+    /* ── Buttons ── */
+    .btn { background: var(--primary); color: white; border: none; padding: 0.55rem 1.15rem; border-radius: 10px; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s, box-shadow 0.2s; display: inline-flex; align-items: center; gap: 0.45rem; text-decoration: none; font-size: 0.875rem; white-space: nowrap; }
+    .btn:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,79,255,0.35); }
+    .btn:active { transform: translateY(0); }
+    .btn-secondary { background: var(--surface-border); color: var(--text); }
+    .btn-secondary:hover { background: #2E4166; box-shadow: none; }
+    .btn-ios { background: linear-gradient(135deg, #1C1C1E, #2C2C2E); border: 1px solid #3A3A3C; color: #EBEBF5; }
+    .btn-ios:hover { background: #3A3A3C; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+    /* ── Upload Progress ── */
+    .upload-progress { display: none; margin-top: 1.1rem; }
+    .progress-header { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.3rem; color: var(--text-muted); }
+    .progress-bar-container { width: 100%; height: 6px; background: var(--surface-border); border-radius: 3px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.25s ease; border-radius: 3px; }
+    .upload-speed { font-size: 0.78rem; color: var(--accent); margin-top: 0.25rem; }
+
+    /* ── File list ── */
+    .file-list { display: flex; flex-direction: column; gap: 0.65rem; }
+    .file-row { display: flex; align-items: center; justify-content: space-between; background: rgba(9,13,22,0.45); border: 1px solid var(--surface-border); border-radius: 13px; padding: 0.8rem 1.1rem; transition: all 0.2s; gap: 0.75rem; }
+    .file-row:hover { transform: translateX(3px); border-color: rgba(26,79,255,0.45); background: rgba(26,79,255,0.06); }
+    .file-info { display: flex; align-items: center; gap: 0.85rem; flex: 1; min-width: 0; }
+    .file-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; background: var(--surface-border); flex-shrink: 0; overflow: hidden; position: relative; }
+    .file-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+    .file-icon .duration-badge { position: absolute; bottom: 1px; right: 1px; background: rgba(0,0,0,0.75); color: #fff; font-size: 7px; font-weight: 600; padding: 1px 3px; border-radius: 3px 0 0 0; }
+    .file-details { flex: 1; min-width: 0; }
+    .file-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .empty-state { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); font-size: 0.9rem; }
+
+    /* ── Speed indicator for iOS uploads ── */
+    #speedIndicator { display: none; }
+
+    footer { text-align: center; padding: 1.5rem; padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); color: var(--text-muted); font-size: 0.8rem; position: relative; z-index: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- iOS Add to Home Screen Banner (shown only in Safari, not standalone) -->
+  <div id="ios-add-banner">
+    <strong>📌 Add to Home Screen for best experience:</strong><br>
+    Tap the <span class="ios-share-icon"></span> Share button → "Add to Home Screen" to use SwiftShare like a native app — no App Store needed.
+  </div>
+
+  <header>
+    <div class="logo-container">
+      <div class="logo-badge">⚡</div>
+      <div class="logo-title">SwiftShare WebShare</div>
+    </div>
+    <div class="ios-badge" id="deviceStatus">
+      <div class="status-dot"></div>
+      <span id="deviceName">Connected</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Upload: iPhone → Android -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📤 Send Files to Phone</h2>
+        <span class="file-meta" id="uploadHint">Select multiple files to upload at full Wi-Fi speed</span>
+      </div>
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+        <div class="dropzone-icon">📥</div>
+        <p class="dropzone-text">Tap to select files, or drag &amp; drop</p>
+        <p class="dropzone-hint">Photos, Videos, Documents, Apps — any format, no limits</p>
+        <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(this.files)">
+      </div>
+      <div class="upload-progress" id="uploadProgressContainer">
+        <div class="progress-header">
+          <span id="uploadStatusText">Uploading…</span>
+          <span id="uploadPercentText">0%</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="uploadProgressBar"></div>
+        </div>
+        <div class="upload-speed" id="speedIndicator"></div>
+      </div>
+    </div>
+
+    <!-- Download: Android → iPhone/PC -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">📥 Files Available on Phone</h2>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="btn btn-secondary" onclick="loadManifest()">🔄 Refresh</button>
+          <a class="btn" id="downloadAllBtn" href="/api/download/all" target="_blank">📦 Download All (.ZIP)</a>
+        </div>
+      </div>
+      <div class="file-list" id="fileList">
+        <div class="empty-state">Loading files from phone…</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    SwiftShare Offline Engine &bull; Zero Data Usage &bull; End-to-End Local Wi-Fi Transfer &bull; iOS PWA Ready
+  </footer>
+
+  <script>
+    const sessionToken = new URLSearchParams(window.location.search).get('token') || '';
+
+    // ── iOS Add-to-Home-Screen banner detection ────────────────────────────────
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone === true;
+    const isInSafari = /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS/.test(navigator.userAgent);
+    if (isIos && !isStandalone && isInSafari) {
+      document.getElementById('ios-add-banner').style.display = 'block';
+    }
+
+    // ── Manifest loader ────────────────────────────────────────────────────────
+    async function loadManifest() {
+      try {
+        const res = await fetch('/api/manifest?token=' + encodeURIComponent(sessionToken));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        if (data.deviceName) {
+          document.getElementById('deviceName').textContent =
+            data.deviceName + ' (' + formatBytes(data.freeSpace || 0) + ' free)';
+        }
+
+        const listContainer = document.getElementById('fileList');
+        if (!data.files || data.files.length === 0) {
+          listContainer.innerHTML = '<div class="empty-state">No files queued on phone yet. Select files on the SwiftShare app to see them here.</div>';
+          return;
+        }
+
+        listContainer.innerHTML = data.files.map(file => {
+          const thumbUrl = '/api/thumbnail/' + encodeURIComponent(file.fileId);
+          const icon = getFileEmoji(file.name, file.mimeType);
+          const hasThumb = isVisualType(file.mimeType);
+          const iconHtml = hasThumb
+            ? `<img src="${thumbUrl}" alt="" onerror="this.style.display='none';this.parentNode.querySelector('.emoji-fallback').style.display='block'">${
+                file.mimeType && file.mimeType.startsWith('video/') ? '<span class="duration-badge">▶</span>' : ''
+              }<span class="emoji-fallback" style="display:none">${icon}</span>`
+            : icon;
+
+          return `
+            <div class="file-row">
+              <div class="file-info">
+                <div class="file-icon">${iconHtml}</div>
+                <div class="file-details">
+                  <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
+                  <div class="file-meta">${formatBytes(file.size)} &bull; ${file.mimeType || 'Binary'}</div>
+                </div>
+              </div>
+              <a class="btn" href="/api/download/${file.fileId}?token=${encodeURIComponent(sessionToken)}" download="${escapeHtml(file.name)}">
+                ⬇ Download
+              </a>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error(err);
+        document.getElementById('fileList').innerHTML =
+          '<div class="empty-state" style="color:var(--danger)">⚠ Could not connect to SwiftShare. Make sure you are on the same Wi-Fi network as the Android device.</div>';
+      }
+    }
+
+    function isVisualType(mime) {
+      if (!mime) return false;
+      return mime.startsWith('image/') || mime.startsWith('video/') ||
+             mime.startsWith('audio/') || mime === 'application/vnd.android.package-archive';
+    }
+
+    // ── File selection & parallel upload (XMLHttpRequest for iOS compat) ───────
+    function handleFileSelect(files) {
+      if (!files || files.length === 0) return;
+      uploadFilesParallel(Array.from(files));
+    }
+
+    async function uploadFilesParallel(files) {
+      const progressContainer = document.getElementById('uploadProgressContainer');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const statusText = document.getElementById('uploadStatusText');
+      const percentText = document.getElementById('uploadPercentText');
+      const speedEl = document.getElementById('speedIndicator');
+
+      progressContainer.style.display = 'block';
+      speedEl.style.display = 'block';
+
+      let totalLoaded = 0;
+      const totalSize = files.reduce((s, f) => s + f.size, 0);
+      let startTime = Date.now();
+
+      // Upload files in batches of 4 for parallel throughput
+      const BATCH = 4;
+      for (let i = 0; i < files.length; i += BATCH) {
+        const batch = files.slice(i, i + BATCH);
+        statusText.textContent = `Uploading ${Math.min(i + BATCH, files.length)}/${files.length} files…`;
+
+        await Promise.all(batch.map(file => new Promise((resolve, reject) => {
+          const formData = new FormData();
+          formData.append('file', file, file.name);
+          formData.append('token', sessionToken);
+
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload');
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              totalLoaded += e.loaded;
+              const pct = Math.round((Math.min(totalLoaded, totalSize) / totalSize) * 100);
+              progressBar.style.width = pct + '%';
+              percentText.textContent = pct + '%';
+              const elapsed = (Date.now() - startTime) / 1000;
+              const speed = elapsed > 0 ? totalLoaded / elapsed : 0;
+              speedEl.textContent = `↑ ${formatBytes(speed)}/s`;
+            }
+          };
+          xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Status ' + xhr.status));
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.send(formData);
+        })));
+      }
+
+      statusText.textContent = `✅ Successfully uploaded ${files.length} file(s)!`;
+      percentText.textContent = '100%';
+      setTimeout(() => { progressContainer.style.display = 'none'; loadManifest(); }, 2200);
+    }
+
+    // ── Drag & drop ────────────────────────────────────────────────────────────
+    const dropzone = document.getElementById('dropzone');
+    ['dragenter', 'dragover'].forEach(e => {
+      dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.add('dragover'); }, false);
+    });
+    ['dragleave', 'drop'].forEach(e => {
+      dropzone.addEventListener(e, ev => { ev.preventDefault(); dropzone.classList.remove('dragover'); }, false);
+    });
+    dropzone.addEventListener('drop', e => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) uploadFilesParallel(Array.from(dt.files));
+    });
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getFileEmoji(name, mime) {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      if (['jpg','jpeg','png','gif','webp','heic','heif'].includes(ext)) return '🖼️';
+      if (['mp4','mkv','avi','mov','webm','m4v'].includes(ext)) return '🎬';
+      if (['mp3','wav','aac','flac','m4a','ogg'].includes(ext)) return '🎵';
+      if (['apk','xapk','apks'].includes(ext)) return '📦';
+      if (['pdf','doc','docx','txt','xls','xlsx','ppt','pptx'].includes(ext)) return '📄';
+      if (['zip','rar','7z','tar','gz'].includes(ext)) return '🗜️';
+      return '📁';
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+    }
+
+    // ── Initial load ────────────────────────────────────────────────────────────
+    loadManifest();
+    setInterval(loadManifest, 6000);
+  </script>
+</body>
+</html>

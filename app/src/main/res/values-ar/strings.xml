@@ -1,0 +1,96 @@
+<resources>
+    <string name="app_name">سويفت شير</string>
+    <string name="send">إرسال</string>
+    <string name="receive">استقبال</string>
+    <string name="web_share">مشاركة الويب</string>
+    <string name="connect_pc">الاتصال بالحاسوب</string>
+    <string name="group_share">المشاركة الجماعية</string>
+    <string name="phone_clone">نسخ الهاتف</string>
+    <string name="safebox">خزنة AES-256</string>
+    <string name="file_explorer">مستعرض الملفات</string>
+    <string name="media_player">مشغل الوسائط</string>
+    <string name="transfer_in_progress">جارٍ نقل الملفات - SwiftShare</string>
+    <string name="connect_ios">الاتصال بـ iPhone / iOS</string>
+    <string name="ios_qr_hint">امسح رمز QR للانضمام إلى Wi-Fi، ثم افتح Safari</string>
+    <string name="send_subtitle">اختر الملفات وابدأ النقل</string>
+    <string name="receive_subtitle">وضع النقطة الساخنة / QR</string>
+    <string name="smart_utilities">الأدوات الذكية</string>
+    <string name="select_files">اختر الملفات للإرسال</string>
+    <string name="transfer_completed">اكتمل النقل</string>
+    <string name="transferring_files">جارٍ نقل الملفات</string>
+    <string name="cancel_transfer">إلغاء النقل</string>
+    <string name="done">تم</string>
+    <string name="clean_now">نظّف الآن</string>
+    <string name="storage_cleaned">تم تنظيف التخزين!</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_transfer">إرسال واستقبال</string>
+    <string name="nav_files">الملفات والتطبيقات</string>
+    <string name="nav_media">مركز الوسائط</string>
+    <string name="nav_history">السجل وملفي</string>
+
+    <!-- Tabs & Categories -->
+    <string name="tab_apps">التطبيقات</string>
+    <string name="tab_photos">الصور</string>
+    <string name="tab_videos">الفيديوهات</string>
+    <string name="tab_music">الموسيقى</string>
+    <string name="tab_docs">المستندات</string>
+    <string name="tab_folders">المجلدات</string>
+
+    <!-- Search & Selection -->
+    <string name="search_hint">ابحث في التطبيقات، الصور، الفيديوهات والملفات…</string>
+    <string name="select_all">تحديد الكل</string>
+    <string name="deselect_all">إلغاء التحديد</string>
+    <string name="selected_count">تم تحديد %1$d (%2$s)</string>
+    <string name="send_selected">إرسال المحدد (%1$d)</string>
+
+    <!-- SafeBox Screen -->
+    <string name="safebox_title">خزنة SafeBox المشفرة (AES-256-GCM)</string>
+    <string name="safebox_locked_title">خزنة SafeBox المشفرة</string>
+    <string name="safebox_locked_subtitle">مفتاح رئيسي مشفر عبر AndroidKeyStore العتادي</string>
+    <string name="safebox_enter_pin">أدخل رمز PIN للخزنة</string>
+    <string name="safebox_set_pin">تعيين رمز PIN رئيسي (4 أرقام)</string>
+    <string name="safebox_confirm_pin">تأكيد رمز PIN الرئيسي</string>
+    <string name="safebox_unlock_btn">فتح الخزنة</string>
+    <string name="safebox_biometric_btn">بصمة الإصبع / القياسات الحيوية</string>
+    <string name="safebox_encrypt_file">+ تشفير ملف</string>
+    <string name="safebox_empty">الخزنة فارغة. الملفات المشفرة مخفية تماماً من النظام.</string>
+    <string name="safebox_restore">استعادة</string>
+    <string name="safebox_preview">معاينة</string>
+
+    <!-- Group Share Screen -->
+    <string name="group_title">بوابة المشاركة الجماعية</string>
+    <string name="group_create_room">إنشاء غرفة (مضيف)</string>
+    <string name="group_join_room">انضمام لغرفة (عضو)</string>
+    <string name="group_desc">أنشئ غرفة تتسع حتى 8 أجهزة. أي ملف يُشارك يتم بثه فورياً لجميع الأعضاء.</string>
+    <string name="group_broadcast_btn">بث الملف لجميع الأعضاء</string>
+    <string name="group_members">أعضاء الغرفة</string>
+    <string name="group_leave">مغادرة</string>
+
+    <!-- Phone Clone Screen -->
+    <string name="clone_title">نسخ الهاتف ونقل البيانات</string>
+    <string name="clone_old_phone">الهاتف القديم (إرسال)</string>
+    <string name="clone_new_phone">الهاتف الجديد (استقبال)</string>
+    <string name="clone_start">بدء ترحيل البيانات</string>
+    <string name="clone_migrating">جارٍ ترحيل البيانات للهاتف الجديد…</string>
+    <string name="clone_complete">اكتمل نسخ الهاتف بنجاح!</string>
+    <string name="clone_contacts">جهات الاتصال</string>
+    <string name="clone_call_logs">سجل المكالمات</string>
+
+    <!-- Settings & Profile -->
+    <string name="settings_device_name">اسم الجهاز والصورة الرمزية</string>
+    <string name="settings_language">اللغة</string>
+    <string name="language_toggle">English</string>
+    <string name="save">حفظ</string>
+    <string name="cancel">إلغاء</string>
+
+    <!-- Radar & QR -->
+    <string name="radar_searching">جارٍ البحث عن الأجهزة القريبة</string>
+    <string name="radar_waiting">بانتظار الاستقبال</string>
+    <string name="radar_scan_qr">📷 مسح QR</string>
+    <string name="radar_radar_view">عرض الرادار</string>
+    <string name="radar_show_qr">إظهار رمز QR</string>
+    <string name="qr_tab_app">رمز التطبيق QR</string>
+    <string name="qr_tab_wifi">رمز Wi-Fi QR</string>
+    <string name="qr_tab_web">رابط WebShare</string>
+</resources>
