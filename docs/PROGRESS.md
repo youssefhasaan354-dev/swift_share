@@ -124,19 +124,22 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
 
 ---
 
-## Known Pre-existing Issues & Lint Audit
+## Static Analysis & Android Lint Audit
 
-A full `./gradlew lintDebug` comparison was conducted between `main` (`fb870af`) and current working branch:
-- **`main` baseline:** 8 errors, 157 warnings.
-- **`feat/phase-2`:** 11 errors, 159 warnings.
-- **Android Lint Scope:** Android Lint checks only production sources (`src/main`). Test sources (`src/test`, `src/androidTest`) are **not** analyzed by default unless `lint.checkTestSources = true` is explicitly configured.
+A comparative audit of `./gradlew lintDebug` was executed against `origin/main` (`fb870af`):
+- **`origin/main` Baseline:** 8 errors, 157 warnings.
+- **`feat/phase-2` (Current):** 8 errors, 157 warnings (0 new errors, 0 new warnings).
+- **Build Behavior:** `lintDebug` succeeds (`BUILD SUCCESSFUL`) despite 8 errors because `lint.abortOnError = false` is configured in `app/build.gradle.kts`.
+- **Test Sources Scope:** Android Lint analyzes only production sources (`src/main`). Test sources (`src/test` and `src/androidTest`) are **not** analyzed by default (`lint.checkTestSources = true` is not enabled).
 
-### Error Classification & Runtime Crash Risk:
-1. **Real Runtime Crash (Critical):**
-   - `LocalHotspotManager.kt:38, 48, 88` (6 errors): Uses `WifiManager.startLocalOnlyHotspot(...)`, `LocalOnlyHotspotCallback`, and `LocalOnlyHotspotReservation`. These APIs require API 26 (Android 8.0), whereas `minSdk` is 24. Invoking hotspot on Android 7.0/7.1 (API 24-25) triggers an unhandled `NoSuchMethodError` runtime crash.
-2. **Logic & Type Mismatch (Medium):**
-   - `VideoToAudioConverter.kt:83` (1 error): Assigns `MediaExtractor.sampleFlags` directly to `MediaCodec.BufferInfo.flags` (`WrongConstant`). In practice `SAMPLE_FLAG_SYNC` matches `BUFFER_FLAG_KEY_FRAME` numerically, but other flags may drift.
-3. **Backup / Security Policy (No direct runtime crash):**
-   - `data_extraction_rules.xml:11-13` (3 errors): Excludes `vault/` and `safebox.db` under `<cloud-backup>` where only `sharedpref` is included (`FullBackupContent`).
-   - `AndroidManifest.xml:66` (1 error): `READ_SMS` permission without explicit `android.hardware.telephony` feature tag required for ChromeOS / Play Store compatibility.
+### Error Classification:
+1. **Pre-existing on `main` (8 errors):**
+   - **Real Runtime Crash (API 24-25):** `LocalHotspotManager.kt:38, 48, 88` (6 errors): `WifiManager.startLocalOnlyHotspot(...)` requires API 26 (Android 8.0). On Android 7.0/7.1 (API 24-25, within `minSdk = 24`), calling hotspot immediately crashes with unhandled `NoSuchMethodError`.
+   - **Type Mismatch:** `VideoToAudioConverter.kt:83` (1 error): Direct assignment of `MediaExtractor.sampleFlags` to `MediaCodec.BufferInfo.flags` (`WrongConstant`).
+   - **Policy Requirement:** `AndroidManifest.xml:66` (1 error): `READ_SMS` permission implies telephony hardware without `<uses-feature android:name="android.hardware.telephony" required="false">` tag (`PermissionImpliesUnsupportedChromeOsHardware`).
+2. **Introduced on our branch and fixed (3 errors):**
+   - `data_extraction_rules.xml:11-13` (3 errors): In commit `e858f46`, `<include domain="root"/>` was added alongside `<exclude>` rules for `file` and `database`, triggering `FullBackupContent` errors.
+   - **Resolution:** Removed the rogue `<include domain="root"/>` in `<device-transfer>`. Both `vault/` and `safebox.db` are strictly excluded across API 31+ (`data_extraction_rules.xml`) and API 24-30 (`backup_rules.xml`), completely eliminating all 3 errors.
+   - **Warning Fix:** Removed obsolete `SDK_INT >= M` checks in `QrPayloadManager.kt` (`minSdk = 24`), eliminating 2 `ObsoleteSdkInt` warnings.
+
 
