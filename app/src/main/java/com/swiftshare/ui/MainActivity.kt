@@ -57,6 +57,7 @@ import com.swiftshare.ui.screens.CleanerScreen
 import com.swiftshare.ui.screens.FilePickerScreen
 import com.swiftshare.ui.screens.GroupShareScreen
 import com.swiftshare.ui.screens.HomeScreen
+import com.swiftshare.ui.screens.InviteScreen
 import com.swiftshare.ui.screens.MediaPlayerScreen
 import com.swiftshare.ui.screens.PcConnectScreen
 import com.swiftshare.ui.screens.PhoneCloneScreen
@@ -507,6 +508,13 @@ class MainActivity : FragmentActivity() {
                                 navController.navigate("home")
                             }
                         }
+                    )
+                }
+
+                // 16. Invite Friends (Bluetooth, Zero-Data LOHS, Share Sheet)
+                composable("invite") {
+                    InviteScreen(
+                        onBack = { navController.popBackStack() }
                     )
                 }
             }

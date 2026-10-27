@@ -103,6 +103,7 @@ fun HomeScreen(
                 FeatureItem("مشاركة جماعية", "غرفة متعددة الأجهزة", "👥", "group_share"),
                 FeatureItem("نسخ الهاتف", "ترحيل كامل بضغطة واحدة", "📲", "phone_clone"),
                 FeatureItem("الخزنة المشفرة", "تشفير عتادي AES-256", "🔒", "safebox"),
+                FeatureItem("دعوة الأصدقاء", "بلوتوث أو نقطة اتصال", "🤝", "invite"),
                 FeatureItem("مستعرض الملفات", "مدير الملفات والمجلدات", "📂", "file_picker")
             )
         } else {
@@ -116,6 +117,7 @@ fun HomeScreen(
                 FeatureItem("Group Share", "Multi-peer Room", "👥", "group_share"),
                 FeatureItem("Phone Clone", "1-click Migration", "📲", "phone_clone"),
                 FeatureItem("SafeBox", "AES-256 Vault", "🔒", "safebox"),
+                FeatureItem("Invite Friends", "Bluetooth & Zero-Data", "🤝", "invite"),
                 FeatureItem("File Explorer", "Storage Analyzer", "📂", "file_picker")
             )
         }

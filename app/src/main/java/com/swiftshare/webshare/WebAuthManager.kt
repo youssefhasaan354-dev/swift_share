@@ -40,6 +40,24 @@ class WebAuthManager {
     // IP -> Pair(failedCount, lockoutUntilTimestamp)
     private val ipRateLimits = ConcurrentHashMap<String, Pair<Int, Long>>()
 
+    // Download rate limits: IP -> Pair(requestCount, windowStartTime)
+    private val downloadRateLimits = ConcurrentHashMap<String, Pair<Int, Long>>()
+
+    fun checkAndRecordDownloadRequest(clientIp: String, maxPerMinute: Int = 30): Boolean {
+        val now = System.currentTimeMillis()
+        val entry = downloadRateLimits[clientIp]
+        if (entry == null || (now - entry.second > 60_000L)) {
+            downloadRateLimits[clientIp] = Pair(1, now)
+            return true
+        }
+        val (count, windowStart) = entry
+        if (count >= maxPerMinute) {
+            return false // Rate limit exceeded
+        }
+        downloadRateLimits[clientIp] = Pair(count + 1, windowStart)
+        return true
+    }
+
     // StateFlow for the phone UI to show "Allow this device?" dialog
     private val _pendingAuthRequest = MutableStateFlow<PendingAuthRequest?>(null)
     val pendingAuthRequest: StateFlow<PendingAuthRequest?> = _pendingAuthRequest.asStateFlow()

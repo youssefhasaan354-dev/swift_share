@@ -179,21 +179,30 @@ class EmbeddedWebShareServer(
 
                 // ── Public invite & APK download (Zero-Data) ──────────────────
                 get("/invite") {
+                    val clientIp = getClientIp(call)
+                    if (!authManager.checkAndRecordDownloadRequest(clientIp)) {
+                        call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded. Please wait a moment.")
+                        return@get
+                    }
                     call.respondText(loadAsset("web/invite/home.html"), ContentType.Text.Html)
                 }
 
-                get("/apps/app-release.apk") {
-                    val sourcePath = this@EmbeddedWebShareServer.context?.applicationInfo?.sourceDir
-                    val appSource = if (sourcePath != null) File(sourcePath) else File("")
-                    if (appSource.exists()) {
-                        call.response.header(
-                            HttpHeaders.ContentDisposition,
-                            ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "SwiftShare.apk").toString()
-                        )
-                        call.respondFile(appSource)
-                    } else {
-                        call.respond(HttpStatusCode.NotFound, "APK not found")
+                get("/apps/SwiftShare.apk") {
+                    val clientIp = getClientIp(call)
+                    if (!authManager.checkAndRecordDownloadRequest(clientIp)) {
+                        call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded. Please wait a moment.")
+                        return@get
                     }
+                    serveApkFile(call)
+                }
+
+                get("/apps/app-release.apk") {
+                    val clientIp = getClientIp(call)
+                    if (!authManager.checkAndRecordDownloadRequest(clientIp)) {
+                        call.respond(HttpStatusCode.TooManyRequests, "Rate limit exceeded. Please wait a moment.")
+                        return@get
+                    }
+                    serveApkFile(call)
                 }
 
                 // ── Landing Pages (WebShare & PC Dashboard) ───────────────────
@@ -503,6 +512,27 @@ class EmbeddedWebShareServer(
     private fun getClientIp(call: ApplicationCall): String {
         return call.request.headers["X-Forwarded-For"]?.split(",")?.firstOrNull()?.trim()
             ?: call.request.local.remoteHost
+    }
+
+    private suspend fun serveApkFile(call: ApplicationCall) {
+        val sourcePath = this@EmbeddedWebShareServer.context?.applicationInfo?.sourceDir
+        val appSource = if (sourcePath != null) File(sourcePath) else File("")
+        val targetFile = if (appSource.exists()) {
+            appSource
+        } else {
+            val cached = this@EmbeddedWebShareServer.context?.let { File(it.cacheDir, "SwiftShare.apk") }
+            if (cached != null && cached.exists()) cached else null
+        }
+
+        if (targetFile != null && targetFile.exists()) {
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "SwiftShare.apk").toString()
+            )
+            call.respondFile(targetFile)
+        } else {
+            call.respond(HttpStatusCode.NotFound, "APK not found")
+        }
     }
 
     private fun renderLoginPage(error: String?): String {

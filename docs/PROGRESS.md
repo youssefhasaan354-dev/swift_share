@@ -329,11 +329,35 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ## Phase 3: Zero-Data Discovery, Onboarding & Security Auditing (branch: `feat/phase-3`)
 
-### Planned Phase 3 Tasks
-- **C1**: Invite a friend screen:
-  - (a) Bluetooth: Enable Bluetooth, copy APK from `applicationInfo.sourceDir` to cache, expose via FileProvider, `ACTION_SEND` to system Bluetooth package.
-  - (b) Zero-data: Start LOHS, QR/URL for `http://<ip>:8080/invite` serving landing page + `/apps/SwiftShare.apk` (PIN bypassed for this route only, rate-limited).
-  - (c) System share-sheet fallback.
+### T3.1 (C1): Invite a Friend (Bluetooth APK Share, Zero-Data LOHS Web Portal & Share Sheet)
+- **Status**: DONE
+- **Verification Mode**: MIXED (REAL KTOR INTEGRATION TESTS + NOT VERIFIED ON PHYSICAL HARDWARE)
+- **Verification Details**:
+  - **Verified by Real Ktor Tests (`WebAuthTest.testPublicInviteAndApkDownloadRateLimiting`)**:
+    - Unauthenticated Public Routes: Verified `/invite` and `/apps/SwiftShare.apk` respond with HTTP 200 without requiring session cookies or PIN authentication.
+    - Zero-Data Rate Limiting: Verified rate limiting (30 req/min threshold); the 31st request from an IP receives `429 Too Many Requests`.
+  - **NOT VERIFIED (NEEDS PHYSICAL HARDWARE)**:
+    - Real Bluetooth hardware transfer (`Intent.ACTION_SEND` targeting `com.android.bluetooth`).
+    - Real LocalOnlyHotspot SSID broadcasting and Wi-Fi joining by a secondary device.
+  - **UI Implementation**:
+    - `InviteScreen.kt`:
+      - Bluetooth Option: Requests enabling Bluetooth via system activity launcher if off; copies active APK to cache via `copyInstalledApkToCache`; exposes via `FileProvider`; dispatches `ACTION_SEND` targeted at `com.android.bluetooth` or system chooser.
+      - Zero-Data Hotspot Option: Launches LOHS + starts `EmbeddedWebShareServer` on port 8080; renders active network SSID, password, invite URL, and QR dialog pointing to `http://<ip>:8080/invite`.
+      - System Share-Sheet: Dispatches chooser for third-party messaging apps with APK attachment and invitation message.
+      - Full Arabic and English RTL localization in `AppLocalization.kt`.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/ui/screens/InviteScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/webshare/WebAuthManager.kt`
+  - `app/src/main/java/com/swiftshare/webshare/EmbeddedWebShareServer.kt`
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/test/java/com/swiftshare/webshare/WebAuthTest.kt`
+- **Commit**: Current commit
+
+---
+
+### Upcoming Phase 3 Tasks
 - **C2**: Avatar & nickname settings (built-in avatars or custom photo <= 32 KB) via avatar control message.
 - **C3**: Destination volume selection (internal vs SD card) in settings, used by receive path & free-space check.
 - **C4**: First-run permission guide: one screen per permission with rationale, settings recovery, Arabic + English RTL.

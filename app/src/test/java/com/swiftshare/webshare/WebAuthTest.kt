@@ -179,4 +179,30 @@ class WebAuthTest {
         }
         assertEquals(HttpStatusCode.TooManyRequests, subsequentRes.status)
     }
+
+    @Test(timeout = 60000)
+    fun testPublicInviteAndApkDownloadRateLimiting() = testApplication {
+        val server = EmbeddedWebShareServer()
+        application {
+            server.configureModule(this)
+        }
+
+        // 1. /invite is public (no PIN required)
+        val inviteRes = client.get("/invite")
+        assertEquals(HttpStatusCode.OK, inviteRes.status)
+
+        // 2. /apps/SwiftShare.apk is public (no PIN required)
+        val apkRes = client.get("/apps/SwiftShare.apk")
+        assertTrue(apkRes.status == HttpStatusCode.OK || apkRes.status == HttpStatusCode.NotFound)
+
+        // 3. Exceed download rate limit (30 requests allowed per minute)
+        for (i in 1..28) {
+            val res = client.get("/invite")
+            assertEquals(HttpStatusCode.OK, res.status)
+        }
+
+        // 31st request triggers rate limit -> 429 Too Many Requests
+        val rateLimitedRes = client.get("/invite")
+        assertEquals(HttpStatusCode.TooManyRequests, rateLimitedRes.status)
+    }
 }

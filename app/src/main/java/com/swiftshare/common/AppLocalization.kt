@@ -70,7 +70,17 @@ data class AppStrings(
     val groupMembers: String,
     val groupBroadcastBtn: String,
     val connectingWifiDirect: String,
-    val acceptPromptOnOtherDevice: String
+    val acceptPromptOnOtherDevice: String,
+    val inviteFriendsTitle: String,
+    val inviteBluetooth: String,
+    val inviteBluetoothDesc: String,
+    val inviteZeroData: String,
+    val inviteZeroDataDesc: String,
+    val inviteShareSheet: String,
+    val inviteShareSheetDesc: String,
+    val bluetoothNotSupported: String,
+    val preparingApk: String,
+    val scanToInstall: String
 )
 
 val EnglishStrings = AppStrings(
@@ -128,7 +138,17 @@ val EnglishStrings = AppStrings(
     groupMembers = "Connected Members",
     groupBroadcastBtn = "Select Files to Broadcast",
     connectingWifiDirect = "Connecting via Wi-Fi Direct…",
-    acceptPromptOnOtherDevice = "Please accept the connection prompt on the other device."
+    acceptPromptOnOtherDevice = "Please accept the connection prompt on the other device.",
+    inviteFriendsTitle = "Invite Friends",
+    inviteBluetooth = "Send via Bluetooth",
+    inviteBluetoothDesc = "Direct offline APK transfer without Wi-Fi",
+    inviteZeroData = "Zero-Data Wi-Fi Invite",
+    inviteZeroDataDesc = "Share APK via hotspot web portal at /invite",
+    inviteShareSheet = "Share via Apps",
+    inviteShareSheetDesc = "Send app link or installer via WhatsApp, Telegram, etc.",
+    bluetoothNotSupported = "Bluetooth is not supported or available on this device.",
+    preparingApk = "Preparing SwiftShare APK package…",
+    scanToInstall = "Scan QR to download SwiftShare APK without mobile data"
 )
 
 val ArabicStrings = AppStrings(
@@ -186,7 +206,17 @@ val ArabicStrings = AppStrings(
     groupMembers = "الأعضاء المتصلون",
     groupBroadcastBtn = "اختيار ملفات للبث الجماعي",
     connectingWifiDirect = "جارٍ الاتصال عبر Wi-Fi Direct…",
-    acceptPromptOnOtherDevice = "يرجى قبول طلب الاتصال على الجهاز الآخر."
+    acceptPromptOnOtherDevice = "يرجى قبول طلب الاتصال على الجهاز الآخر.",
+    inviteFriendsTitle = "دعوة الأصدقاء",
+    inviteBluetooth = "إرسال عبر البلوتوث",
+    inviteBluetoothDesc = "نقل مباشر لتطبيق SwiftShare بدون إنترنت أو شبكة",
+    inviteZeroData = "مشاركة بدون إنترنت (Zero-Data)",
+    inviteZeroDataDesc = "تنزيل التطبيق عبر النقطة الساخنة والمتصفح",
+    inviteShareSheet = "مشاركة عبر التطبيقات",
+    inviteShareSheetDesc = "إرسال رابط التطبيق أو الملف عبر واتساب وتيليجرام",
+    bluetoothNotSupported = "البلوتوث غير متوفر أو غير مدعوم على هذا الجهاز.",
+    preparingApk = "جارٍ تجهيز ملف التثبيت SwiftShare APK…",
+    scanToInstall = "امسح رمز QR لتنزيل تطبيق SwiftShare مجاناً بدون إنترنت"
 )
 
 val LocalAppStrings = compositionLocalOf { EnglishStrings }
