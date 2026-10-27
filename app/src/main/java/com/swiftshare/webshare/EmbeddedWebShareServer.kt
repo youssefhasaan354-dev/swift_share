@@ -23,6 +23,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.http.content.streamProvider
+import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.application.install
@@ -67,10 +68,17 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-class EmbeddedWebShareServer(private val context: Context) {
+fun Application.webShareModule(server: EmbeddedWebShareServer, uploadDir: File? = null) {
+    server.configureModule(this, uploadDir)
+}
 
+class EmbeddedWebShareServer(
+    private val context: Context? = null,
+    customUploadDir: File? = null
+) {
+    var customUploadDir: File? = customUploadDir
     private var engine: ApplicationEngine? = null
-    private val mediaRepo = MediaStoreRepository(context)
+    private val mediaRepo = context?.let { MediaStoreRepository(it) }
 
     val authManager = WebAuthManager()
 
@@ -91,6 +99,15 @@ class EmbeddedWebShareServer(private val context: Context) {
         _activeSessionToken.value = sessionToken
 
         engine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
+            configureModule(this)
+        }.start(wait = false)
+    }
+
+    fun configureModule(application: Application, uploadDirOverride: File? = null) {
+        if (uploadDirOverride != null) {
+            customUploadDir = uploadDirOverride
+        }
+        with(application) {
             install(PartialContent)
             install(WebSockets)
             install(CORS) {
@@ -166,7 +183,8 @@ class EmbeddedWebShareServer(private val context: Context) {
                 }
 
                 get("/apps/app-release.apk") {
-                    val appSource = File(this@EmbeddedWebShareServer.context.applicationInfo.sourceDir)
+                    val sourcePath = this@EmbeddedWebShareServer.context?.applicationInfo?.sourceDir
+                    val appSource = if (sourcePath != null) File(sourcePath) else File("")
                     if (appSource.exists()) {
                         call.response.header(
                             HttpHeaders.ContentDisposition,
@@ -200,11 +218,16 @@ class EmbeddedWebShareServer(private val context: Context) {
                         call.respond(HttpStatusCode.Unauthorized, "{\"error\":\"Authentication required\"}")
                         return@get
                     }
-                    val freeSpace = Environment.getExternalStorageDirectory().freeSpace
+                    val freeSpace = try {
+                        Environment.getExternalStorageDirectory()?.freeSpace ?: (1024L * 1024L * 1024L)
+                    } catch (_: Throwable) {
+                        1024L * 1024L * 1024L
+                    }
                     val items = _queuedFiles.value.map { it.first }
 
+                    val devName = try { Build.MODEL ?: "SwiftShare Device" } catch (_: Throwable) { "SwiftShare Device" }
                     val responseJson = buildJsonObject {
-                        put("deviceName", Build.MODEL)
+                        put("deviceName", devName)
                         put("freeSpace", freeSpace)
                         put("tokenValid", true)
                         put("files", Json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(FileManifestItem.serializer()), items))
@@ -231,8 +254,10 @@ class EmbeddedWebShareServer(private val context: Context) {
                             return@get
                         }
                     }
-                    val allItems = mediaRepo.getPhotos() + mediaRepo.getVideos() +
-                            mediaRepo.getAudio() + mediaRepo.getInstalledApps()
+                    val allItems = (mediaRepo?.getPhotos() ?: emptyList()) +
+                            (mediaRepo?.getVideos() ?: emptyList()) +
+                            (mediaRepo?.getAudio() ?: emptyList()) +
+                            (mediaRepo?.getInstalledApps() ?: emptyList())
                     val found = allItems.find { it.id == fileId }
                     if (found != null) {
                         val thumbBytes = generateMediaItemThumbnailBytes(found)
@@ -300,7 +325,11 @@ class EmbeddedWebShareServer(private val context: Context) {
                         return@post
                     }
                     val multipart = call.receiveMultipart()
-                    val uploadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare")
+                    val uploadDir = customUploadDir ?: try {
+                        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare")
+                    } catch (_: Throwable) {
+                        File(System.getProperty("java.io.tmpdir"), "SwiftShare")
+                    }
                     if (!uploadDir.exists()) uploadDir.mkdirs()
 
                     var uploadedCount = 0
@@ -327,11 +356,11 @@ class EmbeddedWebShareServer(private val context: Context) {
                     }
                     val category = call.request.queryParameters["category"] ?: "photos"
                     val items = when (category) {
-                        "photos" -> mediaRepo.getPhotos()
-                        "videos" -> mediaRepo.getVideos()
-                        "music" -> mediaRepo.getAudio()
-                        "apps" -> mediaRepo.getInstalledApps()
-                        "docs" -> mediaRepo.getDocuments()
+                        "photos" -> mediaRepo?.getPhotos() ?: emptyList()
+                        "videos" -> mediaRepo?.getVideos() ?: emptyList()
+                        "music" -> mediaRepo?.getAudio() ?: emptyList()
+                        "apps" -> mediaRepo?.getInstalledApps() ?: emptyList()
+                        "docs" -> mediaRepo?.getDocuments() ?: emptyList()
                         else -> emptyList()
                     }
 
@@ -356,7 +385,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                         return@get
                     }
                     val id = call.parameters["id"]
-                    val file = mediaRepo.getFileById(id)
+                    val file = mediaRepo?.getFileById(id)
                     if (file != null && file.exists()) {
                         call.respondFile(file)
                     } else {
@@ -370,7 +399,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                         return@get
                     }
                     val id = call.parameters["id"]
-                    val file = mediaRepo.getFileById(id)
+                    val file = mediaRepo?.getFileById(id)
                     if (file != null && file.exists()) {
                         call.response.header(
                             HttpHeaders.ContentDisposition,
@@ -432,7 +461,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                     }
                 }
             }
-        }.start(wait = false)
+        }
     }
 
     private suspend fun handlePageRequest(call: ApplicationCall, assetPath: String) {
@@ -557,7 +586,7 @@ class EmbeddedWebShareServer(private val context: Context) {
             val bmp: Bitmap? = when {
                 mime.startsWith("image/") -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        context.contentResolver.loadThumbnail(Uri.fromFile(file), Size(256, 256), null)
+                        context?.contentResolver?.loadThumbnail(Uri.fromFile(file), Size(256, 256), null)
                     } else {
                         android.graphics.BitmapFactory.decodeFile(file.absolutePath)?.let {
                             Bitmap.createScaledBitmap(it, 256, 256, true)
@@ -566,7 +595,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                 }
                 mime.startsWith("video/") -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        context.contentResolver.loadThumbnail(Uri.fromFile(file), Size(256, 256), null)
+                        context?.contentResolver?.loadThumbnail(Uri.fromFile(file), Size(256, 256), null)
                     } else {
                         android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                     }
@@ -588,20 +617,22 @@ class EmbeddedWebShareServer(private val context: Context) {
                 "photos" -> {
                     val uri = item.thumbnailUri?.let { Uri.parse(it) } ?: return null
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        this@EmbeddedWebShareServer.context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
+                        this@EmbeddedWebShareServer.context?.contentResolver?.loadThumbnail(uri, Size(256, 256), null)
                     } else {
                         val id = android.content.ContentUris.parseId(uri)
                         @Suppress("DEPRECATION")
-                        android.provider.MediaStore.Images.Thumbnails.getThumbnail(
-                            this@EmbeddedWebShareServer.context.contentResolver, id,
-                            android.provider.MediaStore.Images.Thumbnails.MINI_KIND, null
-                        )
+                        this@EmbeddedWebShareServer.context?.contentResolver?.let { resolver ->
+                            android.provider.MediaStore.Images.Thumbnails.getThumbnail(
+                                resolver, id,
+                                android.provider.MediaStore.Images.Thumbnails.MINI_KIND, null
+                            )
+                        }
                     }
                 }
                 "videos" -> {
                     val uri = item.thumbnailUri?.let { Uri.parse(it) }
                     if (uri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        this@EmbeddedWebShareServer.context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
+                        this@EmbeddedWebShareServer.context?.contentResolver?.loadThumbnail(uri, Size(256, 256), null)
                     } else {
                         @Suppress("DEPRECATION")
                         android.media.ThumbnailUtils.createVideoThumbnail(
@@ -618,7 +649,7 @@ class EmbeddedWebShareServer(private val context: Context) {
                     art?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
                 }
                 "apps" -> {
-                    mediaRepo.loadAppIconBitmap(item.packageName, item.path)?.asAndroidBitmap()
+                    mediaRepo?.loadAppIconBitmap(item.packageName, item.path)?.asAndroidBitmap()
                 }
                 else -> null
             } ?: return null
@@ -633,7 +664,8 @@ class EmbeddedWebShareServer(private val context: Context) {
 
     private fun loadAsset(path: String): String {
         return try {
-            context.assets.open(path).bufferedReader().use { it.readText() }
+            context?.assets?.open(path)?.bufferedReader()?.use { it.readText() }
+                ?: "<html><body><h1>SwiftShare WebPortal</h1><p>Test mode</p></body></html>"
         } catch (e: Exception) {
             "<html><body><h1>SwiftShare WebPortal</h1><p>Asset error: ${e.message}</p></body></html>"
         }

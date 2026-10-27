@@ -1,23 +1,29 @@
 package com.swiftshare.common
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppLoggerTest {
 
-    @Test
-    fun testAppLoggerEmitsUserVisibleError() = runBlocking {
+    @Test(timeout = 60000)
+    fun testAppLoggerEmitsUserVisibleError() = runTest {
         val errorMessage = "Critical Wi-Fi Direct connection timeout"
+        val result = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(5_000) {
+                AppLogger.userVisibleErrors.first()
+            }
+        }
         AppLogger.e("TestTag", errorMessage, notifyUser = true)
-
-        val emitted = AppLogger.userVisibleErrors.first()
-        assertEquals(errorMessage, emitted)
+        assertEquals(errorMessage, result.await())
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testAppLoggerHandlesLoggingWithoutException() {
         var success = false
         try {

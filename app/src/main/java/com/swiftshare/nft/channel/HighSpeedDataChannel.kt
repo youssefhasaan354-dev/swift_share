@@ -38,9 +38,16 @@ class HighSpeedDataChannel {
     private val _transferProgress = MutableStateFlow(TransferProgress())
     val transferProgress: StateFlow<TransferProgress> = _transferProgress.asStateFlow()
 
+    private var activeServerChannel: java.nio.channels.ServerSocketChannel? = null
+
+    var serverPort: Int = 0
+        private set
+
     fun startReceiverServer(
         downloadDir: File = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare"),
+        port: Int = Constants.PORT_DATA,
         expectedSessionToken: String? = null,
+        onBound: ((Int) -> Unit)? = null,
         onFileReceived: (File, FileManifestItem) -> Unit = { _, _ -> },
         onError: (Throwable) -> Unit = {}
     ) {
@@ -57,8 +64,11 @@ class HighSpeedDataChannel {
                     // 1 MB receive buffer for maximum Wi-Fi 5GHz throughput
                     socket().receiveBufferSize = Constants.SOCKET_BUFFER_SIZE
                     socket().soTimeout = Constants.SOCKET_TIMEOUT_MS
-                    socket().bind(InetSocketAddress(Constants.PORT_DATA))
+                    socket().bind(InetSocketAddress(port))
                 }
+                activeServerChannel = serverChannel
+                serverPort = (serverChannel.localAddress as InetSocketAddress).port
+                onBound?.invoke(serverPort)
 
                 while (isActive && !isCancelled) {
                     val socketChannel = serverChannel.accept()
@@ -70,6 +80,7 @@ class HighSpeedDataChannel {
             } catch (e: Exception) {
                 if (!isCancelled) onError(e)
             } finally {
+                serverPort = 0
                 try {
                     serverChannel?.close()
                 } catch (_: Exception) {}
@@ -262,6 +273,7 @@ class HighSpeedDataChannel {
         batchTotalBytes: Long,
         cumulativeBytesStart: Long,
         sessionToken: String? = null,
+        port: Int = Constants.PORT_DATA,
         onSuccess: () -> Unit,
         onError: (Throwable) -> Unit
     ) {
@@ -280,7 +292,7 @@ class HighSpeedDataChannel {
                         sock.soTimeout = Constants.SOCKET_TIMEOUT_MS
                         sock.keepAlive = true
                     }
-                    connect(InetSocketAddress(targetIp, Constants.PORT_DATA))
+                    connect(InetSocketAddress(targetIp, port))
                 }
 
                 val offset = ChunkManager.getResumeOffset(manifestItem.fileId)
@@ -385,5 +397,9 @@ class HighSpeedDataChannel {
     fun cancel() {
         isCancelled = true
         serverJob?.cancel()
+        try {
+            activeServerChannel?.close()
+        } catch (_: Exception) {}
+        activeServerChannel = null
     }
 }

@@ -32,16 +32,25 @@ class TransferControlChannel {
     private val _incomingMessages = MutableSharedFlow<ControlMessage>(extraBufferCapacity = 64)
     val incomingMessages: SharedFlow<ControlMessage> = _incomingMessages.asSharedFlow()
 
+    private var activeServerSocket: ServerSocket? = null
+    var serverPort: Int = 0
+        private set
+
     fun startServer(
         expectedSessionToken: String,
         myDeviceName: String,
         freeStorageBytes: Long,
+        port: Int = Constants.PORT_CONTROL_HTTP,
+        onBound: ((Int) -> Unit)? = null,
         onHandshakeComplete: (HandshakeReq) -> Unit
     ) {
         serverJob = scope.launch {
             var serverSocket: ServerSocket? = null
             try {
-                serverSocket = ServerSocket(Constants.PORT_CONTROL_HTTP)
+                serverSocket = ServerSocket(port)
+                activeServerSocket = serverSocket
+                serverPort = serverSocket.localPort
+                onBound?.invoke(serverPort)
                 while (isActive) {
                     val socket = serverSocket.accept()
                     launch {
@@ -50,7 +59,11 @@ class TransferControlChannel {
                 }
             } catch (_: Exception) {
             } finally {
-                serverSocket?.close()
+                serverPort = 0
+                activeServerSocket = null
+                try {
+                    serverSocket?.close()
+                } catch (_: Exception) {}
             }
         }
     }
@@ -175,8 +188,13 @@ class TransferControlChannel {
     fun close() {
         serverJob?.cancel()
         try {
+            activeServerSocket?.close()
+        } catch (_: Exception) {}
+        try {
             activeSocket?.close()
         } catch (_: Exception) {}
+        activeServerSocket = null
+        serverPort = 0
         writer = null
         activeSocket = null
     }

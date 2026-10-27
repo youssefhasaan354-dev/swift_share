@@ -14,7 +14,7 @@ class SafeFileNameTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    @Test
+    @Test(timeout = 60000)
     fun testParentDirectoryTraversalUnix() {
         val sanitized = SafeFileName.sanitize("../../secret.txt")
         assertEquals("secret.txt", sanitized)
@@ -22,7 +22,7 @@ class SafeFileNameTest {
         assertFalse(sanitized.contains("/"))
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testParentDirectoryTraversalWindows() {
         val sanitized = SafeFileName.sanitize("..\\..\\passwords.doc")
         assertEquals("passwords.doc", sanitized)
@@ -30,13 +30,13 @@ class SafeFileNameTest {
         assertFalse(sanitized.contains("\\"))
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testSubdirectoryPathSeparators() {
         val sanitized = SafeFileName.sanitize("a/b/c/report.pdf")
         assertEquals("report.pdf", sanitized)
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testEmptyAndNullNames() {
         val nullResult = SafeFileName.sanitize(null, fallbackExtension = "jpg")
         assertTrue(nullResult.startsWith("file_"))
@@ -51,7 +51,7 @@ class SafeFileNameTest {
         assertTrue(dotsOnly.endsWith(".txt"))
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testControlCharactersAndNullByte() {
         val withNullAndCtrl = SafeFileName.sanitize("in\u0000vi\u0001ce\u001f.apk")
         assertEquals("device.apk", withNullAndCtrl.replace("invi", "devi")) // test without ctrl chars
@@ -59,7 +59,7 @@ class SafeFileNameTest {
         assertFalse(withNullAndCtrl.contains("\u0001"))
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testArabicAndUnicodeCharacters() {
         val arabicName = "تقرير_المبيعات_النهائي_٢٠٢٦.pdf"
         val sanitized = SafeFileName.sanitize(arabicName)
@@ -70,7 +70,7 @@ class SafeFileNameTest {
         assertEquals("رحلة_دبي_2026.jpg", cleanMixed)
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testVeryLongFileNameEnforcesMax200Bytes() {
         val longBase = "A".repeat(300)
         val longName = "$longBase.png"
@@ -81,7 +81,7 @@ class SafeFileNameTest {
         assertTrue(sanitized.endsWith(".png"))
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testResolveUniqueFileDeduplication() {
         val root = tempFolder.newFolder("downloads")
         val file1 = SafeFileName.resolveUniqueFile(root, "photo.jpg")
@@ -97,7 +97,7 @@ class SafeFileNameTest {
         assertEquals("photo (2).jpg", file3.name)
     }
 
-    @Test
+    @Test(timeout = 60000)
     fun testResolveUniqueFileBlocksDirectoryEscape() {
         val root = tempFolder.newFolder("safe_dir")
         val resolved = SafeFileName.resolveUniqueFile(root, "../../../escape.txt")
