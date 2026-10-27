@@ -119,3 +119,136 @@ data class DataChannelHeader(
         }
     }
 }
+
+const val CHUNK_MAX_SIZE = 64 * 1024 // 64 KB
+
+data class StreamAuthHeader(
+    val token: String,
+    val streamIndex: Byte
+) {
+    fun serialize(): ByteBuffer {
+        val tokenBytes = token.toByteArray(Charsets.UTF_8)
+        val buffer = ByteBuffer.allocate(4 + 4 + tokenBytes.size + 1)
+        buffer.put(MAGIC_BYTES)
+        buffer.putInt(tokenBytes.size)
+        buffer.put(tokenBytes)
+        buffer.put(streamIndex)
+        buffer.flip()
+        return buffer
+    }
+
+    companion object {
+        val MAGIC_BYTES = byteArrayOf('S'.code.toByte(), 'W'.code.toByte(), 'F'.code.toByte(), 'T'.code.toByte())
+
+        fun parse(buffer: ByteBuffer): StreamAuthHeader? {
+            if (buffer.remaining() < 4) return null
+            val magic = ByteArray(4)
+            buffer.get(magic)
+            if (!magic.contentEquals(MAGIC_BYTES)) return null
+            if (buffer.remaining() < 4) return null
+            val tokenLen = buffer.int
+            if (tokenLen < 0 || buffer.remaining() < tokenLen + 1) return null
+            val tokenBytes = ByteArray(tokenLen)
+            buffer.get(tokenBytes)
+            val streamIndex = buffer.get()
+            return StreamAuthHeader(String(tokenBytes, Charsets.UTF_8).trim(), streamIndex)
+        }
+    }
+}
+
+data class ChunkHeader(
+    val streamId: Byte,
+    val fileId: String,
+    val offset: Long,
+    val length: Int,
+    val crc32: Long,
+    val isEof: Boolean
+) {
+    fun serialize(): ByteBuffer {
+        val paddedId = fileId.take(36).padEnd(36).toByteArray(Charsets.UTF_8)
+        val buffer = ByteBuffer.allocate(HEADER_SIZE)
+        buffer.put(MAGIC_BYTES)
+        buffer.put(streamId)
+        buffer.put(paddedId)
+        buffer.putLong(offset)
+        buffer.putInt(length)
+        buffer.putLong(crc32)
+        buffer.put(if (isEof) 1.toByte() else 0.toByte())
+        buffer.flip()
+        return buffer
+    }
+
+    companion object {
+        const val HEADER_SIZE = 4 + 1 + 36 + 8 + 4 + 8 + 1 // 62 bytes
+        val MAGIC_BYTES = byteArrayOf('S'.code.toByte(), 'W'.code.toByte(), 'C'.code.toByte(), 'K'.code.toByte())
+
+        fun isMagic(bytes: ByteArray): Boolean {
+            if (bytes.size < 4) return false
+            return bytes[0] == 'S'.code.toByte() &&
+                    bytes[1] == 'W'.code.toByte() &&
+                    bytes[2] == 'C'.code.toByte() &&
+                    bytes[3] == 'K'.code.toByte()
+        }
+
+        fun computeCrc32(data: ByteArray, offset: Int = 0, length: Int = data.size): Long {
+            val crc = java.util.zip.CRC32()
+            crc.update(data, offset, length)
+            return crc.value
+        }
+
+        fun parse(buffer: ByteBuffer): ChunkHeader? {
+            if (buffer.remaining() < HEADER_SIZE) return null
+            val magic = ByteArray(4)
+            buffer.get(magic)
+            if (!isMagic(magic)) return null
+            val streamId = buffer.get()
+            val fileIdBytes = ByteArray(36)
+            buffer.get(fileIdBytes)
+            val fileId = String(fileIdBytes, Charsets.UTF_8).trim()
+            val offset = buffer.long
+            val length = buffer.int
+            val crc32 = buffer.long
+            val isEof = buffer.get() != 0.toByte()
+            return ChunkHeader(streamId, fileId, offset, length, crc32, isEof)
+        }
+
+        sealed class ValidationResult {
+            object Valid : ValidationResult()
+            data class Invalid(val reason: String) : ValidationResult()
+        }
+
+        fun validate(
+            header: ChunkHeader,
+            fileSize: Long,
+            validFileIds: Set<String>
+        ): ValidationResult {
+            if (header.fileId !in validFileIds) {
+                return ValidationResult.Invalid("Unknown fileId: ${header.fileId}")
+            }
+            if (header.offset < 0) {
+                return ValidationResult.Invalid("Negative offset: ${header.offset}")
+            }
+            if (header.length < 0 || header.length > CHUNK_MAX_SIZE) {
+                return ValidationResult.Invalid("Chunk length out of bounds [0..$CHUNK_MAX_SIZE]: ${header.length}")
+            }
+            if (header.offset % CHUNK_MAX_SIZE != 0L) {
+                return ValidationResult.Invalid("Offset is not a multiple of 64KB: ${header.offset}")
+            }
+            if (header.isEof) {
+                return ValidationResult.Valid
+            }
+            if (header.offset >= fileSize) {
+                return ValidationResult.Invalid("Offset >= fileSize: ${header.offset} >= $fileSize")
+            }
+            if (header.offset + header.length > fileSize) {
+                return ValidationResult.Invalid("Offset + length exceeds fileSize: ${header.offset} + ${header.length} > $fileSize")
+            }
+            val expectedLength = minOf(CHUNK_MAX_SIZE.toLong(), fileSize - header.offset).toInt()
+            if (header.length != expectedLength) {
+                return ValidationResult.Invalid("Length ${header.length} does not match expected length $expectedLength")
+            }
+            return ValidationResult.Valid
+        }
+    }
+}
+

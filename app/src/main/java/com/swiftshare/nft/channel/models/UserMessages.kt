@@ -11,7 +11,8 @@ enum class MessageType {
     TRANSFER_MANIFEST,
     FILE_STATUS_ACK,
     PPT_COMMAND,
-    HEARTBEAT
+    HEARTBEAT,
+    FILE_CHECKSUM
 }
 
 @Serializable
@@ -63,6 +64,13 @@ data class TransferManifest(
 )
 
 @Serializable
+data class FileChecksumMessage(
+    val batchId: String,
+    val fileId: String,
+    val sha256: String
+)
+
+@Serializable
 data class FileStatusAck(
     val batchId: String,
     val fileId: String,
@@ -78,6 +86,8 @@ data class PptCommand(
     val y: Float = 0f
 )
 
+private val jsonSerializer = Json { ignoreUnknownKeys = true }
+
 @Serializable
 data class ControlMessage(
     val type: MessageType,
@@ -85,15 +95,17 @@ data class ControlMessage(
     val handshakeAck: HandshakeAck? = null,
     val manifest: TransferManifest? = null,
     val statusAck: FileStatusAck? = null,
-    val pptCommand: PptCommand? = null
+    val pptCommand: PptCommand? = null,
+    val fileChecksum: FileChecksumMessage? = null
 ) {
-    fun toJson(): String = Json { ignoreUnknownKeys = true }.encodeToString(this)
+    fun toJson(): String = jsonSerializer.encodeToString(this)
 
     companion object {
         fun fromJson(json: String): ControlMessage? = try {
-            Json { ignoreUnknownKeys = true }.decodeFromString(json)
+            jsonSerializer.decodeFromString(json)
         } catch (_: Exception) {
             null
         }
     }
 }
+

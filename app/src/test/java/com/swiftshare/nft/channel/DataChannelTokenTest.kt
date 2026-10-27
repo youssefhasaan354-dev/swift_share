@@ -175,4 +175,99 @@ class DataChannelTokenTest {
             channel.cancel()
         }
     }
+
+    @Test(timeout = 60000)
+    fun testStreamAuthHeaderSerializationAndParsing() {
+        val original = StreamAuthHeader(token = "AUTH_STREAM_TOKEN_1", streamIndex = 2.toByte())
+        val buffer = original.serialize()
+        val parsed = StreamAuthHeader.parse(buffer)
+
+        assertNotNull("StreamAuthHeader must parse correctly", parsed)
+        assertEquals(original.token, parsed!!.token)
+        assertEquals(original.streamIndex, parsed.streamIndex)
+    }
+
+    @Test(timeout = 60000)
+    fun testChunkHeaderSerializationAndParsing() {
+        val payload = "Testing Chunk CRC32 payload consistency".toByteArray(Charsets.UTF_8)
+        val crc = ChunkHeader.computeCrc32(payload)
+        val original = ChunkHeader(
+            streamId = 3.toByte(),
+            fileId = "file-uuid-1234-5678-abcdef012345",
+            offset = 65536L,
+            length = payload.size,
+            crc32 = crc,
+            isEof = false
+        )
+
+        val buffer = original.serialize()
+        val parsed = ChunkHeader.parse(buffer)
+
+        assertNotNull("ChunkHeader must parse correctly", parsed)
+        assertEquals(original.streamId, parsed!!.streamId)
+        assertEquals(original.fileId, parsed.fileId)
+        assertEquals(original.offset, parsed.offset)
+        assertEquals(original.length, parsed.length)
+        assertEquals(original.crc32, parsed.crc32)
+        assertEquals(original.isEof, parsed.isEof)
+    }
+
+    @Test(timeout = 60000)
+    fun testChunkHeaderDefensiveBoundaryValidation() {
+        val validFileId = "target-file-id-36-chars-00000000"
+        val activeIds = setOf(validFileId)
+        val fileSize = 150_000L // ~2.28 chunks: chunk 0 (64KB), chunk 1 (64KB), chunk 2 (18928 bytes)
+
+        // 1. Valid full first chunk (64KB at offset 0)
+        val validChunk0 = ChunkHeader(0, validFileId, 0L, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(validChunk0, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Valid)
+
+        // 2. Valid full second chunk (64KB at offset 64KB)
+        val validChunk1 = ChunkHeader(1, validFileId, 65536L, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(validChunk1, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Valid)
+
+        // 3. Valid last chunk (remaining 18928 bytes at offset 131072)
+        val remaining = (fileSize - 131072L).toInt()
+        val validChunk2 = ChunkHeader(2, validFileId, 131072L, remaining, 12345L, false)
+        assertTrue(ChunkHeader.validate(validChunk2, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Valid)
+
+        // 4. Valid EOF chunk
+        val validEof = ChunkHeader(0, validFileId, 0L, 0, 0L, true)
+        assertTrue(ChunkHeader.validate(validEof, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Valid)
+
+        // 5. Boundary Rejection: Unknown fileId
+        val badFileId = ChunkHeader(0, "unknown-file-id", 0L, CHUNK_MAX_SIZE, 12345L, false)
+        val resBadId = ChunkHeader.validate(badFileId, fileSize, activeIds)
+        assertTrue(resBadId is ChunkHeader.Companion.ValidationResult.Invalid)
+        assertTrue((resBadId as ChunkHeader.Companion.ValidationResult.Invalid).reason.contains("Unknown fileId"))
+
+        // 6. Boundary Rejection: Negative offset
+        val negOffset = ChunkHeader(0, validFileId, -65536L, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(negOffset, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 7. Boundary Rejection: Offset not multiple of 64KB
+        val unalignedOffset = ChunkHeader(0, validFileId, 1024L, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(unalignedOffset, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 8. Boundary Rejection: Length out of bounds (> 64KB)
+        val tooLong = ChunkHeader(0, validFileId, 0L, CHUNK_MAX_SIZE + 1, 12345L, false)
+        assertTrue(ChunkHeader.validate(tooLong, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 9. Boundary Rejection: Length negative
+        val negLength = ChunkHeader(0, validFileId, 0L, -1, 12345L, false)
+        assertTrue(ChunkHeader.validate(negLength, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 10. Boundary Rejection: Offset == fileSize (for non-EOF chunk)
+        val offsetEqualsSize = ChunkHeader(0, validFileId, 196608L, 0, 12345L, false)
+        assertTrue(ChunkHeader.validate(offsetEqualsSize, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 11. Boundary Rejection: Offset + length > fileSize
+        val overflowSize = ChunkHeader(2, validFileId, 131072L, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(overflowSize, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+
+        // 12. Boundary Rejection: Long.MAX_VALUE offset
+        val maxOffset = ChunkHeader(0, validFileId, Long.MAX_VALUE, CHUNK_MAX_SIZE, 12345L, false)
+        assertTrue(ChunkHeader.validate(maxOffset, fileSize, activeIds) is ChunkHeader.Companion.ValidationResult.Invalid)
+    }
 }
+
