@@ -230,30 +230,37 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
-### T2.4: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`) & SAF Fallback + QR Token Expiry
-- **Status**: DONE (Code Complete & Unit Tested)
-- **Verification Mode**: MIXED (JVM UNIT TESTS PASSED + NOT VERIFIED ON PHYSICAL DEVICE)
+### T2.4: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`), SAF Fallback, PartSink & QR Token Expiry
+- **Status**: DONE
+- **Verification Mode**: MIXED (REAL JVM UNIT TESTS + NOT VERIFIED ON PHYSICAL DEVICE)
 - **Verification Details**:
   - **Verified by Real JVM Tests (`ScopedStorageTest.kt`)**:
     - QR Token Expiry: Verified `ConnectionPayload` within 10-minute TTL parses successfully, and payload exceeding 10 minutes (`isExpired == true`) is strictly rejected by `QrPayloadManager.parseQrString`.
-    - Random-Access Chunk Writing: Verified `PendingTarget` sequential and out-of-order chunk writing via `FileChannel` at distinct byte offsets with atomic file flush.
+    - `PartSink` Positional Writes: Unit tested `FilePartSink` using NIO `FileChannel` positional writes at non-contiguous byte offsets with atomic `flush()` and size assertion.
+    - Resilient Base64 Serialization: `PartFileManager` uses `android.util.Base64` on device with fallback to `java.util.Base64` under JVM tests.
   - **NOT VERIFIED (NEEDS PHYSICAL DEVICE / REAL MEDIASTORE)**:
     - Android 10+ (API 29+, targetSdk 35) `MediaStore.MediaColumns.IS_PENDING = 1` during multi-stream transfer, transitioning to `IS_PENDING = 0` on SHA-256 match.
-    - Low-level `android.system.Os.pwrite` directly on Android `ParcelFileDescriptor` returned by `ContentResolver.openFileDescriptor`.
+    - Low-level `android.system.Os.pwrite` directly on Android `ParcelFileDescriptor` (`ParcelFileDescriptorPartSink`).
+    - Multi-APK atomic bundle installation via `PackageInstaller` session (`installSplitApks`).
     - SAF (`ACTION_OPEN_DOCUMENT_TREE`) secondary SD card write permissions.
-    - *Requires two real physical devices running Android 10 and Android 14 to verify OS MediaStore indexing and file visibility.*
 - **Files Touched**:
-  - `app/src/main/java/com/swiftshare/common/ScopedStorageManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/common/PartSink.kt`
+  - `app/src/main/java/com/swiftshare/common/ScopedStorageManager.kt`
+  - `app/src/main/java/com/swiftshare/common/ApkInstaller.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/PartFileManager.kt`
   - `app/src/main/java/com/swiftshare/nft/discovery/models/ConnectionPayload.kt`
   - `app/src/main/java/com/swiftshare/nft/discovery/QrPayloadManager.kt`
-  - `app/src/test/java/com/swiftshare/common/ScopedStorageTest.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/test/java/com/swiftshare/common/ScopedStorageTest.kt`
+- **Commit**: `c1a5d79` and current commit
 
 ---
 
 ### Upcoming Phase 2 Tasks
 
-- **CHECKPOINT STOP**: Awaiting user manual testing on two real devices for MediaStore `IS_PENDING` and `Os.pwrite` before proceeding to T2.5.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice` with `WifiP2pInfo` group owner IP).
+- **T2.6**: Group Share on new engine (one sender, several receivers, per-receiver progress, loopback test).
+- **Phase 2 Gate**: Full suite verification, lintDebug 0 errors, branch to `feat/phase-3`.
 
 ---
 
