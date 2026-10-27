@@ -14,8 +14,12 @@ data class ConnectionPayload(
     val sessionToken: String,
     val deviceName: String,
     val avatarId: Int = 1,
-    val lanIp: String? = null
+    val lanIp: String? = null,
+    val timestamp: Long = System.currentTimeMillis(),
+    val ttlMillis: Long = 600_000L // 10 minutes TTL
 ) {
+    val isExpired: Boolean
+        get() = (System.currentTimeMillis() - timestamp) > ttlMillis
     fun toJson(): String {
         return Json { ignoreUnknownKeys = true; prettyPrint = false }.encodeToString(this)
     }

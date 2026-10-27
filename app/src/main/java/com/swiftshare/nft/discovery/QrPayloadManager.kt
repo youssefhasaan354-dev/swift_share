@@ -67,7 +67,13 @@ object QrPayloadManager {
 
         // 1. JSON ConnectionPayload
         val jsonPayload = com.swiftshare.nft.discovery.models.ConnectionPayload.fromJson(trimmed)
-        if (jsonPayload != null) return jsonPayload
+        if (jsonPayload != null) {
+            if (jsonPayload.isExpired) {
+                com.swiftshare.common.AppLogger.e("QrPayloadManager", "QR token has expired (> 10 minutes)", notifyUser = true)
+                return null
+            }
+            return jsonPayload
+        }
 
         // 2. Standard Wi-Fi QR format
         if (trimmed.startsWith("WIFI:", ignoreCase = true)) {
