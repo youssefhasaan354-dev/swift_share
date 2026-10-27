@@ -103,7 +103,20 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
 ---
 
 ## Phase 2: Transfer Engine & Protocol Parity (branch: `feat/phase-2`)
-- **T2.1**: Control Channel Handshake & State Machine Activation (wire up `TransferControlChannel` in `SwiftShareViewModel` & `RadarScanScreen`).
+
+### T2.1: Control Channel Handshake & State Machine Activation
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT & INTEGRATION TESTS
+- **Verification Details**: Real tests in `TransferControlChannelTest.kt`: (1) Bidirectional TCP handshake accepted on matching session token and storage bounds. (2) Connection rejected when session token mismatches. (3) Over-the-wire manifest transmission and delivery verification. (4) Status ACK delivery verification. `SwiftShareViewModel` and `RadarScanScreen` wired so receiver listens for handshake on control channel, auto-transitions to `transfer_progress` upon sender connection, and delivers manifest.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/RadarScanScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/TransferControlChannelTest.kt`
+- **Commit**: `a6a8cd4`
+
+### Upcoming Phase 2 Tasks
 - **T2.2**: 4 Parallel Streams & Non-Blocking NIO with Real Socket Timeouts.
 - **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
 - **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
