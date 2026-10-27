@@ -317,6 +317,7 @@ class MainActivity : FragmentActivity() {
                 // 3. Radar Sender Mode
                 composable("radar_send") {
                     RadarScanScreen(
+                        viewModel = vm,
                         isReceiverMode = false,
                         onPeerConnected = { peer ->
                             vm.connectAndSendFiles(peer)
@@ -329,6 +330,7 @@ class MainActivity : FragmentActivity() {
                 // 4. Radar Receiver Mode (Hotspot / Group Owner + QR)
                 composable("radar_receive") {
                     RadarScanScreen(
+                        viewModel = vm,
                         isReceiverMode = true,
                         onPeerConnected = { peer ->
                             vm.activePeer.value = peer

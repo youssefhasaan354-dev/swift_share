@@ -60,13 +60,14 @@ import java.util.concurrent.Executors
 
 @Composable
 fun RadarScanScreen(
+    viewModel: com.swiftshare.ui.SwiftShareViewModel? = null,
     isReceiverMode: Boolean,
     onPeerConnected: (PeerDevice) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val strings = LocalAppStrings.current
-    val discoveryManager = remember { DeviceDiscoveryManager(context) }
+    val discoveryManager = viewModel?.discoveryManager ?: remember { DeviceDiscoveryManager(context) }
     val discoveredPeers by discoveryManager.allDiscoveredPeers.collectAsState()
     val activePayload by discoveryManager.activePayload.collectAsState()
 
@@ -75,20 +76,35 @@ fun RadarScanScreen(
 
     LaunchedEffect(isReceiverMode) {
         if (isReceiverMode) {
-            discoveryManager.startReceiverMode(
-                deviceName = Build.MODEL,
-                avatarId = 1,
-                onReady = { showQrDialog = true },
-                onError = {}
-            )
+            if (viewModel != null) {
+                viewModel.startReceiver(onReady = { showQrDialog = true })
+            } else {
+                discoveryManager.startReceiverMode(
+                    deviceName = Build.MODEL,
+                    avatarId = 1,
+                    onReady = { showQrDialog = true },
+                    onError = {}
+                )
+            }
         } else {
             discoveryManager.startSenderMode()
         }
     }
 
+    if (isReceiverMode && viewModel != null) {
+        LaunchedEffect(Unit) {
+            viewModel.connectedPeerEvent.collect { peer ->
+                showQrDialog = false
+                onPeerConnected(peer)
+            }
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
-            discoveryManager.stop()
+            if (viewModel == null) {
+                discoveryManager.stop()
+            }
         }
     }
 

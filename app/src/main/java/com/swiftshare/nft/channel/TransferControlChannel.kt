@@ -118,12 +118,13 @@ class TransferControlChannel {
         myDeviceName: String,
         sessionToken: String,
         freeStorageBytes: Long,
+        port: Int = Constants.PORT_CONTROL_HTTP,
         onHandshakeSuccess: (HandshakeAck) -> Unit,
         onError: (String) -> Unit
     ) {
         scope.launch {
             try {
-                val socket = Socket(hostIp, Constants.PORT_CONTROL_HTTP)
+                val socket = Socket(hostIp, port)
                 activeSocket = socket
                 val out = PrintWriter(socket.getOutputStream(), true)
                 writer = out

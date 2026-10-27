@@ -21,6 +21,7 @@ import com.swiftshare.groupshare.GroupShareEngine
 import com.swiftshare.nft.channel.HighSpeedDataChannel
 import com.swiftshare.nft.channel.TransferControlChannel
 import com.swiftshare.nft.channel.models.FileManifestItem
+import com.swiftshare.nft.channel.models.FileTransferStatus
 import com.swiftshare.nft.channel.models.TransferManifest
 import com.swiftshare.nft.channel.models.TransferProgress
 import com.swiftshare.nft.discovery.DeviceDiscoveryManager
@@ -33,8 +34,11 @@ import com.swiftshare.service.TransferForegroundService
 import com.swiftshare.statussaver.StatusSaverManager
 import com.swiftshare.webshare.EmbeddedWebShareServer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
@@ -109,13 +113,38 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
         webShareServer.setQueuedFiles(manifestPairs)
     }
 
+    val connectedPeerEvent = MutableSharedFlow<PeerDevice>(extraBufferCapacity = 8)
+
     fun startReceiver(onReady: (ConnectionPayload) -> Unit) {
+        val devName = try { Build.MODEL ?: "SwiftShare Receiver" } catch (_: Throwable) { "SwiftShare Receiver" }
         discoveryManager.startReceiverMode(
-            deviceName = Build.MODEL,
+            deviceName = devName,
             avatarId = 1,
             onReady = { payload ->
                 activeReceiverPayload.value = payload
-                // Start control channel and NIO data server
+                val freeStorage = try {
+                    Environment.getExternalStorageDirectory()?.freeSpace ?: (10L * 1024L * 1024L * 1024L)
+                } catch (_: Throwable) {
+                    10L * 1024L * 1024L * 1024L
+                }
+
+                controlChannel.startServer(
+                    expectedSessionToken = payload.sessionToken,
+                    myDeviceName = devName,
+                    freeStorageBytes = freeStorage,
+                    onHandshakeComplete = { req ->
+                        val peer = PeerDevice(
+                            id = req.deviceName,
+                            deviceName = req.deviceName,
+                            ip = payload.ip,
+                            port = Constants.PORT_DATA,
+                            sessionToken = payload.sessionToken
+                        )
+                        activePeer.value = peer
+                        connectedPeerEvent.tryEmit(peer)
+                    }
+                )
+
                 dataChannel.startReceiverServer(
                     expectedSessionToken = payload.sessionToken,
                     onFileReceived = { file, item ->
@@ -140,39 +169,76 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
         val files = selectedSendFiles.value
         val totalBytes = files.sumOf { it.size }
         val batchId = "batch_" + UUID.randomUUID().toString()
+        val devName = try { Build.MODEL ?: "SwiftShare Sender" } catch (_: Throwable) { "SwiftShare Sender" }
 
         TransferForegroundService.startService(context, files.firstOrNull()?.name ?: "Transfer", totalBytes)
 
-        viewModelScope.launch(Dispatchers.IO) {
-            var cumulative = 0L
-            for (item in files) {
-                val file = File(item.path)
-                if (file.exists()) {
-                    val manifestItem = FileManifestItem(
+        val freeStorage = try {
+            Environment.getExternalStorageDirectory()?.freeSpace ?: (10L * 1024L * 1024L * 1024L)
+        } catch (_: Throwable) {
+            10L * 1024L * 1024L * 1024L
+        }
+
+        controlChannel.connectToHost(
+            hostIp = peer.ip,
+            myDeviceName = devName,
+            sessionToken = peer.sessionToken ?: "",
+            freeStorageBytes = freeStorage,
+            onHandshakeSuccess = {
+                val manifestItems = files.map { item ->
+                    FileManifestItem(
                         fileId = UUID.randomUUID().toString(),
                         name = item.name,
                         size = item.size,
                         mimeType = item.mimeType,
                         thumbnailBase64 = generateThumbnailBase64(item)
                     )
-                    dataChannel.sendFile(
-                        targetIp = peer.ip,
-                        manifestItem = manifestItem,
-                        sourceFile = file,
-                        batchTotalBytes = totalBytes,
-                        cumulativeBytesStart = cumulative,
-                        sessionToken = peer.sessionToken,
-                        onSuccess = {
-                            recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
-                        },
-                        onError = { e ->
-                            com.swiftshare.common.AppLogger.e("SwiftShareVM", "File transfer failed (${item.name}): ${e.message}", e, notifyUser = true)
-                        }
-                    )
-                    cumulative += item.size
                 }
+                controlChannel.sendManifest(
+                    TransferManifest(
+                        batchId = batchId,
+                        fileCount = manifestItems.size,
+                        totalBytes = totalBytes,
+                        files = manifestItems
+                    )
+                )
+
+                viewModelScope.launch(Dispatchers.IO) {
+                    var cumulative = 0L
+                    for ((index, item) in files.withIndex()) {
+                        val file = File(item.path)
+                        val manifestItem = manifestItems.getOrNull(index) ?: FileManifestItem(
+                            fileId = UUID.randomUUID().toString(),
+                            name = item.name,
+                            size = item.size,
+                            mimeType = item.mimeType
+                        )
+                        if (file.exists()) {
+                            dataChannel.sendFile(
+                                targetIp = peer.ip,
+                                manifestItem = manifestItem,
+                                sourceFile = file,
+                                batchTotalBytes = totalBytes,
+                                cumulativeBytesStart = cumulative,
+                                sessionToken = peer.sessionToken,
+                                onSuccess = {
+                                    recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
+                                    controlChannel.sendStatusAck(batchId, manifestItem.fileId, FileTransferStatus.COMPLETED, item.size)
+                                },
+                                onError = { e ->
+                                    com.swiftshare.common.AppLogger.e("SwiftShareVM", "File transfer failed (${item.name}): ${e.message}", e, notifyUser = true)
+                                    controlChannel.sendStatusAck(batchId, manifestItem.fileId, FileTransferStatus.FAILED, 0L)
+                                }
+                            )
+                            cumulative += item.size
+                        }
+                    }
+                }
+            },
+            onError = { err ->
+                com.swiftshare.common.AppLogger.e("SwiftShareVM", "Handshake failed with peer ${peer.deviceName}: $err", notifyUser = true)
             }
-        }
+        )
     }
 
     private fun recordTransfer(fileName: String, path: String, size: Long, mime: String, isIncoming: Boolean) {
@@ -194,6 +260,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun cancelTransfer() {
+        controlChannel.close()
         dataChannel.cancel()
         TransferForegroundService.stopService(getApplication())
         QrPayloadManager.unbindProcessNetwork(getApplication())
@@ -204,6 +271,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
         discoveryManager.stop()
         webShareServer.stop()
         pcRemoteServer.stop()
+        controlChannel.close()
         dataChannel.cancel()
         QrPayloadManager.unbindProcessNetwork(getApplication())
     }
