@@ -135,6 +135,7 @@ class DeviceDiscoveryManager(private val context: Context) {
         hotspotManager.stopHotspot()
         nsdManager.stop()
         bleManager.stop()
+        QrPayloadManager.unbindProcessNetwork(context)
         _activePayload.value = null
         _allDiscoveredPeers.value = emptyList()
     }

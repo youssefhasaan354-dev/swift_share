@@ -128,7 +128,7 @@ class PhoneCloneEngine(
                 context.contentResolver.insert(CallLog.Calls.CONTENT_URI, values)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("PhoneClone", "Failed to restore call log: ${e.message}", e, notifyUser = true)
         }
     }
 
@@ -189,7 +189,7 @@ class PhoneCloneEngine(
                     try {
                         context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        com.swiftshare.common.AppLogger.e("PhoneClone", "Batch contact insertion failed: ${e.message}", e)
                     }
                     ops.clear()
                 }
@@ -236,7 +236,7 @@ class PhoneCloneEngine(
                 context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("PhoneClone", "Failed to parse contacts VCF: ${e.message}", e, notifyUser = true)
         }
         return importedCount
     }

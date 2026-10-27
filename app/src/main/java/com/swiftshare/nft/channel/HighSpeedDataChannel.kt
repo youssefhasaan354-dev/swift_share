@@ -251,7 +251,7 @@ class HighSpeedDataChannel {
                 ChunkManager.saveResumeOffset(fileId, bytesTransferred)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("DataChannel", "Error processing incoming data channel connection: ${e.message}", e, notifyUser = true)
         }
     }
 

@@ -24,6 +24,7 @@ import com.swiftshare.nft.channel.models.FileManifestItem
 import com.swiftshare.nft.channel.models.TransferManifest
 import com.swiftshare.nft.channel.models.TransferProgress
 import com.swiftshare.nft.discovery.DeviceDiscoveryManager
+import com.swiftshare.nft.discovery.QrPayloadManager
 import com.swiftshare.nft.discovery.models.ConnectionPayload
 import com.swiftshare.nft.discovery.models.PeerDevice
 import com.swiftshare.pc.PcRemoteServer
@@ -120,13 +121,19 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                     onFileReceived = { file, item ->
                         recordTransfer(item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true)
                     },
-                    onError = { e -> e.printStackTrace() }
+                    onError = { e ->
+                        com.swiftshare.common.AppLogger.e("SwiftShareVM", "Receiver channel failed: ${e.message}", e, notifyUser = true)
+                    }
                 )
                 onReady(payload)
             },
-            onError = { /* ignore or log */ }
+            onError = { err ->
+                com.swiftshare.common.AppLogger.e("SwiftShareVM", "Receiver mode failed: $err", notifyUser = true)
+            }
         )
     }
+
+    val userErrors = com.swiftshare.common.AppLogger.userVisibleErrors
 
     fun connectAndSendFiles(peer: PeerDevice) {
         activePeer.value = peer
@@ -158,7 +165,9 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                         onSuccess = {
                             recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
                         },
-                        onError = { e -> e.printStackTrace() }
+                        onError = { e ->
+                            com.swiftshare.common.AppLogger.e("SwiftShareVM", "File transfer failed (${item.name}): ${e.message}", e, notifyUser = true)
+                        }
                     )
                     cumulative += item.size
                 }
@@ -184,11 +193,18 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun cancelTransfer() {
+        dataChannel.cancel()
+        TransferForegroundService.stopService(getApplication())
+        QrPayloadManager.unbindProcessNetwork(getApplication())
+    }
+
     override fun onCleared() {
         super.onCleared()
         discoveryManager.stop()
         webShareServer.stop()
         pcRemoteServer.stop()
         dataChannel.cancel()
+        QrPayloadManager.unbindProcessNetwork(getApplication())
     }
 }

@@ -48,7 +48,7 @@ class SafeBoxVault(
             true
         } catch (e: Exception) {
             encryptedFile.delete()
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("SafeBoxVault", "Failed to encrypt to vault: ${e.message}", e, notifyUser = true)
             false
         }
     }
@@ -69,7 +69,7 @@ class SafeBoxVault(
             true
         } catch (e: Exception) {
             restoredFile.delete()
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("SafeBoxVault", "Failed to restore from vault: ${e.message}", e, notifyUser = true)
             false
         }
     }
@@ -111,7 +111,7 @@ class SafeBoxVault(
             true
         } catch (e: Exception) {
             encryptedFile.delete()
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("SafeBoxVault", "Failed to encrypt URI to vault: ${e.message}", e, notifyUser = true)
             false
         }
     }

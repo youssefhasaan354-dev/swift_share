@@ -96,7 +96,7 @@ class TransferControlChannel {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("ControlChannel", "Socket reader terminated: ${e.message}", e)
         }
     }
 
@@ -167,7 +167,7 @@ class TransferControlChannel {
             try {
                 writer?.println(msg.toJson())
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.swiftshare.common.AppLogger.e("ControlChannel", "Failed to send control message: ${e.message}", e)
             }
         }
     }

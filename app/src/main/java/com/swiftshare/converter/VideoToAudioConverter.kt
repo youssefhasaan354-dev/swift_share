@@ -102,7 +102,7 @@ class VideoToAudioConverter(private val context: Context) {
             onProgress(1f)
             outputFile
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("VideoToAudio", "Conversion failed for $outputFileName: ${e.message}", e, notifyUser = true)
             try { muxer?.release() } catch (_: Exception) {}
             try { extractor.release() } catch (_: Exception) {}
             null
@@ -123,7 +123,7 @@ class VideoToAudioConverter(private val context: Context) {
             }
             context.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.w("VideoToAudio", "Failed to register audio in MediaStore: ${e.message}", e)
         }
     }
 }

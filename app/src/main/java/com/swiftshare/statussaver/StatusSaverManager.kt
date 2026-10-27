@@ -76,7 +76,7 @@ class StatusSaverManager(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.swiftshare.common.AppLogger.e("StatusSaver", "Failed to query status folder: ${e.message}", e)
             }
         }
 
@@ -112,7 +112,7 @@ class StatusSaverManager(private val context: Context) {
             }
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("StatusSaver", "Failed to save status to gallery: ${e.message}", e, notifyUser = true)
             false
         }
     }

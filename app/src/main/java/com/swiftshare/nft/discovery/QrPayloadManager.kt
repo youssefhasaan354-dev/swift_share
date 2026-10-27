@@ -143,6 +143,28 @@ object QrPayloadManager {
         }
     }
 
+    private var activeNetworkCallback: ConnectivityManager.NetworkCallback? = null
+
+    fun unbindProcessNetwork(context: Context) {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                connectivityManager.bindProcessToNetwork(null)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("QrPayloadManager", "Failed to bindProcessToNetwork(null): ${e.message}")
+        }
+
+        try {
+            activeNetworkCallback?.let { callback ->
+                connectivityManager.unregisterNetworkCallback(callback)
+                activeNetworkCallback = null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("QrPayloadManager", "Failed to unregisterNetworkCallback: ${e.message}")
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun autoConnectWifi(
         context: Context,
@@ -155,6 +177,8 @@ object QrPayloadManager {
             ?: return onError("ConnectivityManager unavailable")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            unbindProcessNetwork(context)
+
             val specifier = WifiNetworkSpecifier.Builder()
                 .setSsid(ssid)
                 .setWpa2Passphrase(preSharedKey)
@@ -169,16 +193,25 @@ object QrPayloadManager {
             val networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     super.onAvailable(network)
-                    connectivityManager.bindProcessToNetwork(network)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        connectivityManager.bindProcessToNetwork(network)
+                    }
                     onConnected()
                 }
 
                 override fun onUnavailable() {
                     super.onUnavailable()
+                    unbindProcessNetwork(context)
                     onError("Failed to connect to Wi-Fi hotspot: Timed out or rejected")
+                }
+
+                override fun onLost(network: Network) {
+                    super.onLost(network)
+                    unbindProcessNetwork(context)
                 }
             }
 
+            activeNetworkCallback = networkCallback
             connectivityManager.requestNetwork(request, networkCallback)
         } else {
             @Suppress("DEPRECATION")

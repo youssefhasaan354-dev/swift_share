@@ -44,7 +44,7 @@ object ApkInstaller {
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("ApkInstaller", "Failed to start install activity: ${e.message}", e, notifyUser = true)
         }
     }
 }

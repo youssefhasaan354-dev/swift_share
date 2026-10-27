@@ -43,7 +43,7 @@ object NetworkUtils {
                 )
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w("NetworkUtils", "Error determining local IP address: ${e.message}", e)
         }
         return "192.168.49.1" // Standard Android Wi-Fi Direct GO default
     }

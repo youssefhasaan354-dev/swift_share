@@ -64,7 +64,7 @@ class MediaStoreRepository(private val context: Context) {
                 imgBitmap
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.w("MediaStoreRepo", "Failed to load icon ($cacheKey): ${e.message}", e)
             null
         }
     }
@@ -352,7 +352,7 @@ class MediaStoreRepository(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("MediaStoreRepo", "MediaStore query failed: ${e.message}", e)
         }
     }
 }

@@ -68,7 +68,7 @@ object SplitApkExtractor {
                 totalSizeBytes = totalSize
             )
         } catch (e: Exception) {
-            e.printStackTrace()
+            com.swiftshare.common.AppLogger.e("SplitApkExtractor", "Failed to extract package bundle ($packageName): ${e.message}", e)
             null
         }
     }

@@ -104,7 +104,7 @@ class GroupShareEngine(
                         _broadcastStatus.value = "Broadcast of ${file.name} complete!"
                     },
                     onError = { err ->
-                        err.printStackTrace()
+                        com.swiftshare.common.AppLogger.e("GroupShareEngine", "Broadcast error: ${err.message}", err, notifyUser = true)
                         _broadcastStatus.value = "Broadcast error: ${err.message}"
                     }
                 )

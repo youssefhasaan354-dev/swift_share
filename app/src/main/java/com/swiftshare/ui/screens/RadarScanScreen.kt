@@ -280,7 +280,7 @@ fun CameraScannerPreview(onBarcodeDetected: (String) -> Unit) {
                         imageAnalyzer
                     )
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    com.swiftshare.common.AppLogger.e("RadarScan", "Camera bind failed: ${e.message}", e, notifyUser = true)
                 }
             }, ContextCompat.getMainExecutor(ctx))
 
