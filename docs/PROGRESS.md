@@ -121,3 +121,22 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
 - **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
 - **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
+
+---
+
+## Known Pre-existing Issues & Lint Audit
+
+A full `./gradlew lintDebug` comparison was conducted between `main` (`fb870af`) and current working branch:
+- **`main` baseline:** 8 errors, 157 warnings.
+- **`feat/phase-2`:** 11 errors, 159 warnings.
+- **Android Lint Scope:** Android Lint checks only production sources (`src/main`). Test sources (`src/test`, `src/androidTest`) are **not** analyzed by default unless `lint.checkTestSources = true` is explicitly configured.
+
+### Error Classification & Runtime Crash Risk:
+1. **Real Runtime Crash (Critical):**
+   - `LocalHotspotManager.kt:38, 48, 88` (6 errors): Uses `WifiManager.startLocalOnlyHotspot(...)`, `LocalOnlyHotspotCallback`, and `LocalOnlyHotspotReservation`. These APIs require API 26 (Android 8.0), whereas `minSdk` is 24. Invoking hotspot on Android 7.0/7.1 (API 24-25) triggers an unhandled `NoSuchMethodError` runtime crash.
+2. **Logic & Type Mismatch (Medium):**
+   - `VideoToAudioConverter.kt:83` (1 error): Assigns `MediaExtractor.sampleFlags` directly to `MediaCodec.BufferInfo.flags` (`WrongConstant`). In practice `SAMPLE_FLAG_SYNC` matches `BUFFER_FLAG_KEY_FRAME` numerically, but other flags may drift.
+3. **Backup / Security Policy (No direct runtime crash):**
+   - `data_extraction_rules.xml:11-13` (3 errors): Excludes `vault/` and `safebox.db` under `<cloud-backup>` where only `sharedpref` is included (`FullBackupContent`).
+   - `AndroidManifest.xml:66` (1 error): `READ_SMS` permission without explicit `android.hardware.telephony` feature tag required for ChromeOS / Play Store compatibility.
+
