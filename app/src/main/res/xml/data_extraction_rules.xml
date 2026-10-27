@@ -7,7 +7,6 @@
         <exclude domain="database" path="safebox.db" />
     </cloud-backup>
     <device-transfer>
-        <include domain="root" />
         <exclude domain="file" path="vault" />
         <exclude domain="file" path="vault/" />
         <exclude domain="database" path="safebox.db" />

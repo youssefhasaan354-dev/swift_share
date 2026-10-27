@@ -148,9 +148,7 @@ object QrPayloadManager {
     fun unbindProcessNetwork(context: Context) {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                connectivityManager.bindProcessToNetwork(null)
-            }
+            connectivityManager.bindProcessToNetwork(null)
         } catch (e: Exception) {
             android.util.Log.e("QrPayloadManager", "Failed to bindProcessToNetwork(null): ${e.message}")
         }
@@ -193,9 +191,7 @@ object QrPayloadManager {
             val networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     super.onAvailable(network)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        connectivityManager.bindProcessToNetwork(network)
-                    }
+                    connectivityManager.bindProcessToNetwork(network)
                     onConnected()
                 }
 

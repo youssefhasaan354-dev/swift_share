@@ -108,3 +108,24 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
 - **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
 - **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
+
+---
+
+## Static Analysis & Android Lint Audit
+
+A comparative audit of `./gradlew lintDebug` was executed against `origin/main` (`fb870af`):
+- **`origin/main` Baseline:** 8 errors, 157 warnings.
+- **`feat/phase-1` (Current):** 8 errors, 157 warnings (0 new errors, 0 new warnings).
+- **Build Behavior:** `lintDebug` succeeds (`BUILD SUCCESSFUL`) despite 8 errors because `lint.abortOnError = false` is configured in `app/build.gradle.kts`.
+- **Test Sources Scope:** Android Lint analyzes only production sources (`src/main`). Test sources (`src/test` and `src/androidTest`) are **not** analyzed by default (`lint.checkTestSources = true` is not enabled).
+
+### Error Classification:
+1. **Pre-existing on `main` (8 errors):**
+   - **Real Runtime Crash (API 24-25):** `LocalHotspotManager.kt:38, 48, 88` (6 errors): `WifiManager.startLocalOnlyHotspot(...)` requires API 26 (Android 8.0). On Android 7.0/7.1 (API 24-25, within `minSdk = 24`), calling hotspot immediately crashes with unhandled `NoSuchMethodError`.
+   - **Type Mismatch:** `VideoToAudioConverter.kt:83` (1 error): Direct assignment of `MediaExtractor.sampleFlags` to `MediaCodec.BufferInfo.flags` (`WrongConstant`).
+   - **Policy Requirement:** `AndroidManifest.xml:66` (1 error): `READ_SMS` permission implies telephony hardware without `<uses-feature android:name="android.hardware.telephony" required="false">` tag (`PermissionImpliesUnsupportedChromeOsHardware`).
+2. **Introduced on our branch and fixed (3 errors):**
+   - `data_extraction_rules.xml:11-13` (3 errors): In commit `e858f46`, `<include domain="root"/>` was added alongside `<exclude>` rules for `file` and `database`, triggering `FullBackupContent` errors.
+   - **Resolution:** Removed the rogue `<include domain="root"/>` in `<device-transfer>`. Both `vault/` and `safebox.db` are strictly excluded across API 31+ (`data_extraction_rules.xml`) and API 24-30 (`backup_rules.xml`), completely eliminating all 3 errors.
+   - **Warning Fix:** Removed obsolete `SDK_INT >= M` checks in `QrPayloadManager.kt` (`minSdk = 24`), eliminating 2 `ObsoleteSdkInt` warnings.
+
