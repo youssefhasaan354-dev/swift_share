@@ -302,9 +302,44 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
-### Upcoming Phase 2 Tasks
+### Phase 2 Gate Verification
+- **Status**: DONE
+- **Verification Command**: `./gradlew.bat assembleDebug lintDebug testDebugUnitTest --rerun-tasks`
+- **Verification Mode**: VERIFIED BY FRESH BUILD & TEST EXECUTION (55 actionable tasks executed, 0 from cache)
+- **Gate Metrics**:
+  - **Unit Tests**: **49 executed, 0 failures, 0 errors, 0 skipped** across 11 test suites:
+    - `AppLoggerTest`: 2 tests passed
+    - `DistinctPortTest`: 2 tests passed
+    - `SafeFileNameTest`: 9 tests passed
+    - `ScopedStorageTest`: 3 tests passed
+    - `RoomMigrationTest`: 2 tests passed
+    - `GroupShareEngineTest`: 1 test passed
+    - `DataChannelTokenTest`: 8 tests passed
+    - `MultiStreamDataChannelTest`: 9 tests passed
+    - `TransferControlChannelTest`: 7 tests passed
+    - `WifiP2pOrchestrationTest`: 2 tests passed
+    - `WebAuthTest`: 4 tests passed
+  - **Android Lint**:
+    - **Lint Errors: 0** (Baseline on `main`: 8 errors; 100% eliminated).
+    - **Lint Warnings: 161** (Baseline on `main`: 157 warnings; 4 new obsolete API / button border deprecation warnings).
+  - **APK Assembly**: `assembleDebug` passed cleanly.
+- **Next Phase Transition**: Branching `feat/phase-3` directly from `feat/phase-2`.
 
-- **Phase 2 Gate**: Full suite verification (`./gradlew assembleDebug lintDebug testDebugUnitTest --rerun-tasks`), record metrics in `PROGRESS.md`, create branch `feat/phase-3` from `feat/phase-2`.
+---
+
+## Phase 3: Zero-Data Discovery, Onboarding & Security Auditing (branch: `feat/phase-3`)
+
+### Planned Phase 3 Tasks
+- **C1**: Invite a friend screen:
+  - (a) Bluetooth: Enable Bluetooth, copy APK from `applicationInfo.sourceDir` to cache, expose via FileProvider, `ACTION_SEND` to system Bluetooth package.
+  - (b) Zero-data: Start LOHS, QR/URL for `http://<ip>:8080/invite` serving landing page + `/apps/SwiftShare.apk` (PIN bypassed for this route only, rate-limited).
+  - (c) System share-sheet fallback.
+- **C2**: Avatar & nickname settings (built-in avatars or custom photo <= 32 KB) via avatar control message.
+- **C3**: Destination volume selection (internal vs SD card) in settings, used by receive path & free-space check.
+- **C4**: First-run permission guide: one screen per permission with rationale, settings recovery, Arabic + English RTL.
+- **C5**: Incoming APK certificate SHA-256 and dangerous permissions security check before install.
+- **C6**: System share sheet intake (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`).
+- **C7**: History UX: grouped by session, filter sent/received, received files browser, delete, re-send.
 
 ---
 
@@ -312,7 +347,8 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 A comparative audit of `./gradlew lintDebug` was executed against `origin/main` (`fb870af`):
 - **`origin/main` Baseline:** 8 errors, 157 warnings.
-- **`feat/phase-2` (Current):** **0 errors**, 158 warnings (100% of errors eliminated).
+- **`feat/phase-2`:** **0 errors**, 161 warnings (100% of errors eliminated).
+- **Verification Mode:** VERIFIED BY REAL LINTDEBUG EXECUTION (`BUILD SUCCESSFUL`, 0 errors reported in `lint-results-debug.xml`).
 - **Verification Mode:** VERIFIED BY REAL LINTDEBUG EXECUTION (`BUILD SUCCESSFUL`, 0 errors reported in `lint-results-debug.xml` / `lint-results-debug.html`).
 - **Build Behavior:** `lintDebug` succeeds with 0 errors.
 - **Test Sources Scope:** Android Lint analyzes only production sources (`src/main`). Test sources (`src/test` and `src/androidTest`) are **not** analyzed by default (`lint.checkTestSources = true` is not enabled).
