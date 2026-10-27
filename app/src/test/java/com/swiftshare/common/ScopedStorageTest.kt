@@ -49,32 +49,34 @@ class ScopedStorageTest {
     }
 
     @Test(timeout = 60000)
-    fun testDirectFilePendingTargetWriteAndPublish() {
+    fun testFilePartSinkPositionalWritesAndFlush() {
         val tempDir = File(System.getProperty("java.io.tmpdir"), "scoped_storage_test_${System.currentTimeMillis()}")
         tempDir.mkdirs()
 
         val destFile = File(tempDir, "document.pdf")
-        val raf = java.io.RandomAccessFile(destFile, "rw")
+        val sink = FilePartSink(destFile)
 
         val target = ScopedStorageManager.PendingTarget(
             uri = null,
             file = destFile,
             pfd = null,
-            channel = raf.channel,
+            sink = sink,
             isMediaStore = false
         )
 
         try {
             // Write chunk 0
             val chunk0 = "First chunk bytes".toByteArray(Charsets.UTF_8)
-            target.channel!!.write(ByteBuffer.wrap(chunk0), 0L)
+            val written0 = target.sink.write(0L, chunk0, 0, chunk0.size)
+            assertEquals(chunk0.size, written0)
 
             // Write chunk 1 at offset
             val chunk1 = "Second chunk bytes".toByteArray(Charsets.UTF_8)
-            target.channel!!.write(ByteBuffer.wrap(chunk1), chunk0.size.toLong())
+            val written1 = target.sink.write(chunk0.size.toLong(), chunk1, 0, chunk1.size)
+            assertEquals(chunk1.size, written1)
 
-            target.channel!!.force(true)
-            target.channel!!.close()
+            target.sink.flush()
+            target.sink.close()
 
             assertTrue(destFile.exists())
             assertEquals((chunk0.size + chunk1.size).toLong(), destFile.length())

@@ -26,6 +26,51 @@ object ApkInstaller {
         context.startActivity(intent)
     }
 
+    /**
+     * Installs split APK bundles via Android PackageInstaller session.
+     */
+    fun installSplitApks(context: Context, apkFiles: List<File>) {
+        val validFiles = apkFiles.filter { it.exists() && it.isFile }
+        if (validFiles.isEmpty()) return
+
+        if (validFiles.size == 1) {
+            installApk(context, validFiles[0])
+            return
+        }
+
+        try {
+            val packageInstaller = context.packageManager.packageInstaller
+            val params = android.content.pm.PackageInstaller.SessionParams(
+                android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL
+            )
+            val sessionId = packageInstaller.createSession(params)
+            val session = packageInstaller.openSession(sessionId)
+
+            session.use { activeSession ->
+                for (file in validFiles) {
+                    file.inputStream().use { input ->
+                        activeSession.openWrite(file.name, 0, file.length()).use { output ->
+                            input.copyTo(output)
+                            activeSession.fsync(output)
+                        }
+                    }
+                }
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setPackage(context.packageName)
+                }
+                val pendingIntent = android.app.PendingIntent.getActivity(
+                    context,
+                    sessionId,
+                    intent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) android.app.PendingIntent.FLAG_MUTABLE else 0)
+                )
+                activeSession.commit(pendingIntent.intentSender)
+            }
+        } catch (e: Exception) {
+            AppLogger.e("ApkInstaller", "Failed to install split APK bundle: ${e.message}", e, notifyUser = true)
+        }
+    }
+
     fun openFile(context: Context, file: File, mimeType: String = "*/*") {
         if (!file.exists()) return
 

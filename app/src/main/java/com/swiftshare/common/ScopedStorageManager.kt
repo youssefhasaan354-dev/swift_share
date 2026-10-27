@@ -27,7 +27,7 @@ class ScopedStorageManager(private val context: Context) {
         val uri: Uri?,
         val file: File?,
         val pfd: ParcelFileDescriptor?,
-        val channel: FileChannel?,
+        val sink: PartSink,
         val isMediaStore: Boolean
     )
 
@@ -50,14 +50,15 @@ class ScopedStorageManager(private val context: Context) {
                     val targetDoc = subDir?.createFile(mimeType, fileName)
                     if (targetDoc != null) {
                         val pfd = contentResolver.openFileDescriptor(targetDoc.uri, "rw")
-                        val channel = pfd?.let { FileOutputStream(it.fileDescriptor).channel }
-                        return PendingTarget(
-                            uri = targetDoc.uri,
-                            file = null,
-                            pfd = pfd,
-                            channel = channel,
-                            isMediaStore = false
-                        )
+                        if (pfd != null) {
+                            return PendingTarget(
+                                uri = targetDoc.uri,
+                                file = null,
+                                pfd = pfd,
+                                sink = ParcelFileDescriptorPartSink(pfd),
+                                isMediaStore = false
+                            )
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -79,14 +80,15 @@ class ScopedStorageManager(private val context: Context) {
                 val itemUri = contentResolver.insert(collectionUri, values)
                 if (itemUri != null) {
                     val pfd = contentResolver.openFileDescriptor(itemUri, "rw")
-                    val channel = pfd?.let { FileOutputStream(it.fileDescriptor).channel }
-                    return PendingTarget(
-                        uri = itemUri,
-                        file = null,
-                        pfd = pfd,
-                        channel = channel,
-                        isMediaStore = true
-                    )
+                    if (pfd != null) {
+                        return PendingTarget(
+                            uri = itemUri,
+                            file = null,
+                            pfd = pfd,
+                            sink = ParcelFileDescriptorPartSink(pfd),
+                            isMediaStore = true
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 AppLogger.e("ScopedStorage", "MediaStore creation failed, falling back to direct file: ${e.message}", e)
@@ -97,47 +99,30 @@ class ScopedStorageManager(private val context: Context) {
         val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), subDirName)
         if (!downloadDir.exists()) downloadDir.mkdirs()
         val destFile = File(downloadDir, fileName)
-        val raf = RandomAccessFile(destFile, "rw")
         return PendingTarget(
             uri = Uri.fromFile(destFile),
             file = destFile,
             pfd = null,
-            channel = raf.channel,
+            sink = FilePartSink(destFile),
             isMediaStore = false
         )
     }
 
     /**
-     * Writes a chunk at a given offset using the target's FileChannel or Os.pwrite.
+     * Writes a chunk at a given offset using PartSink.
      */
     fun writeChunk(target: PendingTarget, offset: Long, data: ByteArray, length: Int) {
-        val channel = target.channel
-        if (channel != null) {
-            val buf = ByteBuffer.wrap(data, 0, length)
-            channel.write(buf, offset)
-        } else if (target.pfd != null) {
-            // Low-level Os.pwrite fallback if channel is unavailable
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    android.system.Os.pwrite(target.pfd.fileDescriptor, data, 0, length, offset)
-                }
-            } catch (e: Exception) {
-                throw java.io.IOException("Os.pwrite failed at offset $offset: ${e.message}", e)
-            }
-        }
+        target.sink.write(offset, data, 0, length)
     }
 
     /**
      * Publishes a completed and verified file.
-     * Sets IS_PENDING = 0 on Android 10+ MediaStore, closes file descriptors, and returns public URI.
+     * Sets IS_PENDING = 0 on Android 10+ MediaStore, closes sink, and returns public URI.
      */
     fun publishFile(target: PendingTarget): Uri? {
         try {
-            target.channel?.force(true)
-            target.channel?.close()
-        } catch (_: Exception) {}
-        try {
-            target.pfd?.close()
+            target.sink.flush()
+            target.sink.close()
         } catch (_: Exception) {}
 
         if (target.isMediaStore && target.uri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -156,7 +141,7 @@ class ScopedStorageManager(private val context: Context) {
      */
     fun abortFile(target: PendingTarget) {
         try {
-            target.channel?.close()
+            target.sink.close()
         } catch (_: Exception) {}
         try {
             target.pfd?.close()

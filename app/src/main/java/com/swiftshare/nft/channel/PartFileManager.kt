@@ -30,17 +30,36 @@ object PartFileManager {
     }
 
     fun bitSetToBase64(bitSet: BitSet): String {
-        return java.util.Base64.getEncoder().encodeToString(bitSet.toByteArray())
+        val bytes = bitSet.toByteArray()
+        return try {
+            android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        } catch (_: Throwable) {
+            encodeJvm(bytes)
+        }
     }
 
     fun base64ToBitSet(base64: String, totalChunks: Int): BitSet {
         if (base64.isBlank()) return BitSet(totalChunks)
         return try {
-            val bytes = java.util.Base64.getDecoder().decode(base64)
+            val bytes = try {
+                android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
+            } catch (_: Throwable) {
+                decodeJvm(base64)
+            }
             BitSet.valueOf(bytes)
         } catch (_: Exception) {
             BitSet(totalChunks)
         }
+    }
+
+    @android.annotation.TargetApi(android.os.Build.VERSION_CODES.O)
+    private fun encodeJvm(bytes: ByteArray): String {
+        return java.util.Base64.getEncoder().encodeToString(bytes)
+    }
+
+    @android.annotation.TargetApi(android.os.Build.VERSION_CODES.O)
+    private fun decodeJvm(base64: String): ByteArray {
+        return java.util.Base64.getDecoder().decode(base64)
     }
 
     /**

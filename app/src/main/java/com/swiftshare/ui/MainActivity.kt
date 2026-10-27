@@ -360,8 +360,9 @@ class MainActivity : FragmentActivity() {
                 composable("transfer_result") {
                     val result = vm.lastTransferResult.collectAsState().value
                     val progress = vm.dataChannel.transferProgress.collectAsState().value
+                    val selectedFiles = vm.selectedSendFiles.collectAsState().value
                     val isSuccess = result?.isSuccess ?: (progress.status == com.swiftshare.nft.channel.models.FileTransferStatus.COMPLETED)
-                    val filesCount = result?.fileCount ?: vm.selectedSendFiles.value.size.coerceAtLeast(1)
+                    val filesCount = result?.fileCount ?: selectedFiles.size.coerceAtLeast(1)
                     val totalBytes = result?.totalBytes ?: progress.batchTotalBytes
                     val peerName = result?.peerName ?: activePeer?.deviceName ?: "Peer Device"
 
