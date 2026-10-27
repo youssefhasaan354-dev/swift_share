@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.OpenableColumns
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -348,6 +349,57 @@ class MainActivity : FragmentActivity() {
                         peerDeviceName = activePeer?.deviceName ?: "Peer Device",
                         onFinish = {
                             TransferForegroundService.stopService(this@MainActivity)
+                            navController.navigate("transfer_result") {
+                                popUpTo("transfer_progress") { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                // 5b. Transfer Result Screen (Retry, Open, Send more, Done)
+                composable("transfer_result") {
+                    val result = vm.lastTransferResult.collectAsState().value
+                    val progress = vm.dataChannel.transferProgress.collectAsState().value
+                    val isSuccess = result?.isSuccess ?: (progress.status == com.swiftshare.nft.channel.models.FileTransferStatus.COMPLETED)
+                    val filesCount = result?.fileCount ?: vm.selectedSendFiles.value.size.coerceAtLeast(1)
+                    val totalBytes = result?.totalBytes ?: progress.batchTotalBytes
+                    val peerName = result?.peerName ?: activePeer?.deviceName ?: "Peer Device"
+
+                    com.swiftshare.ui.screens.TransferResultScreen(
+                        batchId = result?.batchId ?: "session_${System.currentTimeMillis()}",
+                        isSuccess = isSuccess,
+                        fileCount = filesCount,
+                        totalBytes = totalBytes,
+                        peerName = peerName,
+                        onRetry = {
+                            navController.popBackStack()
+                        },
+                        onOpen = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(
+                                        Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).path + "/SwiftShare"),
+                                        "resource/folder"
+                                    )
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                startActivity(intent)
+                            } catch (_: Exception) {
+                                try {
+                                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                        type = "*/*"
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
+                        },
+                        onSendMore = {
+                            navController.navigate("file_picker") {
+                                popUpTo("home")
+                            }
+                        },
+                        onDone = {
                             navController.navigate("home") {
                                 popUpTo("home") { inclusive = true }
                             }

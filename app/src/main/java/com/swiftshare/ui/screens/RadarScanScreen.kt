@@ -257,6 +257,43 @@ fun RadarScanScreen(
                 onDismiss = { showQrDialog = false }
             )
         }
+
+        // Receiver Transfer Offer Dialog ("Allow <nickname> to send N files (X MB)?")
+        val incomingOffer by (viewModel?.incomingTransferOffer?.collectAsState() ?: remember { mutableStateOf(null) })
+        if (incomingOffer != null) {
+            val offer = incomingOffer!!
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel?.rejectIncomingOffer(offer) },
+                title = {
+                    Text(text = "Transfer Request", fontWeight = FontWeight.Bold, color = TextPrimary)
+                },
+                text = {
+                    Text(
+                        text = "Allow ${offer.senderName} to send ${offer.fileCount} files (${com.swiftshare.common.NetworkUtils.formatBytes(offer.totalBytes)})?",
+                        color = TextSecondary,
+                        fontSize = 14.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel?.acceptIncomingOffer(offer) },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                    ) {
+                        Text("Allow")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { viewModel?.rejectIncomingOffer(offer) },
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceBorderDark)
+                    ) {
+                        Text("Decline", color = TextSecondary)
+                    }
+                },
+                containerColor = SurfaceDark,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
     }
 }
 

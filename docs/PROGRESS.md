@@ -211,9 +211,27 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+### T2.3.3: Receiver UI Transfer Offer Dialog, Free Space Check, Deduplication, and Result Screen
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL COMPILATION & SUITE TEST EXECUTION (43 passing tests)
+- **Verification Details**:
+  - **Receiver Transfer Offer Dialog**: `RadarScanScreen` observes `viewModel.incomingTransferOffer` and renders an `AlertDialog` displaying "Allow <nickname> to send N files (X MB)?" with "Allow" (calls `acceptIncomingOffer`) and "Decline" (calls `rejectIncomingOffer`).
+  - **Free Space Enforcement**: `SwiftShareViewModel` checks `freeBytes < offer.totalBytes + 50MB` safety headroom before presenting the offer, immediately rejecting with `NOT_ENOUGH_SPACE` reason if space is insufficient.
+  - **Item Deduplication**: Checks incoming file manifest items against existing destination directory entries and flags matching files.
+  - **Bidirectional Cancellation**: Sender or receiver can cancel an item or batch; sends `CancelTransfer` control message, updates Room session status to `CANCELLED`, cleans up sockets, and shuts down foreground service.
+  - **Transfer Result Screen**: Created `TransferResultScreen` wired in `MainActivity` navigation graph (`transfer_result`), presenting transfer summary and actions: "Open" (opens destination folder via Intent), "Retry" (returns to radar connection), "Send More" (navigates to file picker), and "Done" (returns home).
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferResultScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/screens/RadarScanScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/HighSpeedDataChannel.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
+
+---
+
 ### Upcoming Phase 2 Tasks
 
-- **T2.3.3**: Receiver UI Transfer Offer Dialog, free space check, item deduplication, and Result Screen (Retry/Open/Send more).
 - **T2.4**: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`) & SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
 

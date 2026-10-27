@@ -280,14 +280,19 @@ class HighSpeedDataChannel {
                 val totalChunks = ((manifestItem?.size ?: 0L) + CHUNK_SIZE - 1) / CHUNK_SIZE
                 fileTotalChunks.putIfAbsent(header.fileId, totalChunks.toInt())
 
-                val (partFile, metaFile) = PartFileManager.resolvePartFileAndMeta(
-                    downloadDir = downloadDir,
-                    fileId = header.fileId,
-                    fileName = manifestItem?.name ?: header.fileId,
-                    totalSize = manifestItem?.size ?: 0L
-                )
-                activePartFiles.putIfAbsent(header.fileId, partFile)
-                activeMetaFiles.putIfAbsent(header.fileId, metaFile)
+                val partFile = activePartFiles.computeIfAbsent(header.fileId) {
+                    val (p, m) = PartFileManager.resolvePartFileAndMeta(
+                        downloadDir = downloadDir,
+                        fileId = header.fileId,
+                        fileName = manifestItem?.name ?: header.fileId,
+                        totalSize = manifestItem?.size ?: 0L
+                    )
+                    activeMetaFiles[header.fileId] = m
+                    p
+                }
+                val metaFile = activeMetaFiles.computeIfAbsent(header.fileId) {
+                    PartFileManager.getMetaFile(partFile)
+                }
 
                 val bitmap = fileBitmaps.computeIfAbsent(header.fileId) {
                     val diskMeta = PartFileManager.readMeta(metaFile)
@@ -739,12 +744,18 @@ class HighSpeedDataChannel {
             fileRaStreams.clear()
             activePartFiles.values.forEach { file ->
                 try {
-                    if (file.exists()) file.delete()
+                    for (i in 0..20) {
+                        if (!file.exists() || file.delete()) break
+                        Thread.sleep(50)
+                    }
                 } catch (_: Exception) {}
             }
             activeMetaFiles.values.forEach { file ->
                 try {
-                    if (file.exists()) file.delete()
+                    for (i in 0..20) {
+                        if (!file.exists() || file.delete()) break
+                        Thread.sleep(50)
+                    }
                 } catch (_: Exception) {}
             }
             activePartFiles.clear()

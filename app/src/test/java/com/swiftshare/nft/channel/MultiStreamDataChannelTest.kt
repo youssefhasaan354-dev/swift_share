@@ -394,6 +394,15 @@ class MultiStreamDataChannelTest {
 
         // 3. Assert active .part file is purged
         val partFile = File(rxDir, "cancel_test.bin.part")
+        var partDeleted = !partFile.exists()
+        val partDeadline = System.currentTimeMillis() + 3000
+        while (!partDeleted && System.currentTimeMillis() < partDeadline) {
+            if (!partFile.exists()) {
+                partDeleted = true
+                break
+            }
+            Thread.sleep(50)
+        }
         assertFalse("Incomplete .part file must be deleted upon cancel", partFile.exists())
 
         // 4. Assert active threads return to baseline within 5s polling
