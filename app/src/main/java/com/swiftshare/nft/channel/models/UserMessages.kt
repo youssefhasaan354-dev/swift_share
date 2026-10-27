@@ -12,8 +12,29 @@ enum class MessageType {
     FILE_STATUS_ACK,
     PPT_COMMAND,
     HEARTBEAT,
-    FILE_CHECKSUM
+    FILE_CHECKSUM,
+    FILE_RESUME_REQUEST
 }
+
+@Serializable
+data class FileResumeRequest(
+    val batchId: String,
+    val fileId: String,
+    val chunkCount: Int,
+    val completedChunksBase64: String
+)
+
+@Serializable
+data class PartFileMeta(
+    val fileId: String,
+    val fileName: String,
+    val size: Long,
+    val chunkSize: Int,
+    val totalChunks: Int,
+    val completedChunksBase64: String,
+    val sha256: String? = null,
+    val updatedAt: Long = System.currentTimeMillis()
+)
 
 @Serializable
 enum class FileTransferStatus {
@@ -96,7 +117,8 @@ data class ControlMessage(
     val manifest: TransferManifest? = null,
     val statusAck: FileStatusAck? = null,
     val pptCommand: PptCommand? = null,
-    val fileChecksum: FileChecksumMessage? = null
+    val fileChecksum: FileChecksumMessage? = null,
+    val fileResumeRequest: FileResumeRequest? = null
 ) {
     fun toJson(): String = jsonSerializer.encodeToString(this)
 

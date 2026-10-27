@@ -3,6 +3,7 @@ package com.swiftshare.nft.channel
 import com.swiftshare.nft.channel.models.FileManifestItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -448,5 +449,253 @@ class MultiStreamDataChannelTest {
         assertEquals("Server watchdog must close stalled connection", -1, read)
         assertTrue("Watchdog should abort within ~3500ms (timeout was 1500ms)", elapsed < 3500)
         sc.close()
+    }
+
+    @Test(timeout = 60000)
+    fun test50MbInterruptedTransferResumesAndSendsLessThan70PercentOfFile() = runBlocking {
+        val receiver1 = HighSpeedDataChannel()
+        val sender1 = HighSpeedDataChannel()
+        activeChannels.add(receiver1)
+        activeChannels.add(sender1)
+
+        val fileSize = 50L * 1024L * 1024L // 50 MB
+        val sourceFile = createSyntheticFile(txDir, "resume_50mb.bin", fileSize)
+        val expectedSha = computeSha256(sourceFile)
+        val fileId = UUID.randomUUID().toString()
+        val manifestItem = FileManifestItem(fileId = fileId, name = "resume_50mb.bin", size = fileSize)
+        val token = "RESUME_TOKEN"
+
+        // Step 1: Start 1st receiver session
+        val boundLatch1 = CountDownLatch(1)
+        receiver1.startReceiverServer(
+            downloadDir = rxDir,
+            port = 0,
+            expectedSessionToken = token,
+            onBound = { boundLatch1.countDown() }
+        )
+        assertTrue(boundLatch1.await(5, TimeUnit.SECONDS))
+        val port1 = receiver1.serverPort
+        receiver1.registerManifestItem(manifestItem)
+
+        // Step 2: Start 1st sender, interrupt when receiver reaches ~40%
+        val reached40Percent = CountDownLatch(1)
+        val monitorJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                if (receiver1.getReceivedBytes(fileId) >= 0.40 * fileSize) {
+                    reached40Percent.countDown()
+                    break
+                }
+                kotlinx.coroutines.delay(10)
+            }
+        }
+        val sender1Job = CoroutineScope(Dispatchers.IO).launch {
+            sender1.sendFileParallel(
+                targetIp = "127.0.0.1",
+                manifestItem = manifestItem,
+                sourceFile = sourceFile,
+                sessionToken = token,
+                port = port1,
+                streamCount = 4,
+                onSuccess = {},
+                onError = {}
+            )
+        }
+
+        assertTrue("Transfer must reach 40% before interruption", reached40Percent.await(15, TimeUnit.SECONDS))
+        monitorJob.cancel()
+
+        // Simulate network disconnect / stream drop (NOT user explicit cancel!)
+        sender1.cancel(explicitUserCancel = false)
+        sender1Job.cancel()
+        Thread.sleep(150)
+        receiver1.cancel(explicitUserCancel = false)
+
+        // Verify .part and .part.meta were KEPT on disk
+        val partFile = File(rxDir, "resume_50mb.bin.part")
+        val metaFile = File(rxDir, "resume_50mb.bin.part.meta")
+        assertTrue("Partial .part file must exist on disk after disconnect", partFile.exists())
+        assertTrue("Partial .part.meta file must exist on disk after disconnect", metaFile.exists())
+
+        // Step 3: Reconnect with new receiver and sender instances
+        val receiver2 = HighSpeedDataChannel()
+        val sender2 = HighSpeedDataChannel()
+        activeChannels.add(receiver2)
+        activeChannels.add(sender2)
+
+        // Inspect on-disk resume bitmap (must be loaded from disk, not memory!)
+        val resumeBitmap = receiver2.getResumeBitmap(rxDir, fileId, "resume_50mb.bin", fileSize)
+        assertNotNull("Resume bitmap must be read from on-disk metadata", resumeBitmap)
+        assertTrue("Resume bitmap must have completed chunks recorded", resumeBitmap!!.cardinality() > 0)
+
+        val completedChunksCount = resumeBitmap.cardinality()
+        val completedBytes = completedChunksCount.toLong() * HighSpeedDataChannel.CHUNK_SIZE
+        assertTrue("Already completed bytes should be roughly ~40%", completedBytes >= 0.35 * fileSize)
+
+        val boundLatch2 = CountDownLatch(1)
+        val finishLatch = CountDownLatch(1)
+        var receivedFinalFile: File? = null
+
+        receiver2.startReceiverServer(
+            downloadDir = rxDir,
+            port = 0,
+            expectedSessionToken = token,
+            onBound = { boundLatch2.countDown() },
+            onFileReceived = { file, _ ->
+                receivedFinalFile = file
+                finishLatch.countDown()
+            }
+        )
+        assertTrue(boundLatch2.await(5, TimeUnit.SECONDS))
+        val port2 = receiver2.serverPort
+        receiver2.registerManifestItem(manifestItem)
+        receiver2.notifyChecksumReceived(fileId, expectedSha)
+
+        // Sender transmits only missing chunks using resumeBitmap
+        val sender2Finished = CountDownLatch(1)
+        CoroutineScope(Dispatchers.IO).launch {
+            sender2.sendFileParallel(
+                targetIp = "127.0.0.1",
+                manifestItem = manifestItem,
+                sourceFile = sourceFile,
+                sessionToken = token,
+                port = port2,
+                streamCount = 4,
+                resumeBitmap = resumeBitmap,
+                onSuccess = { sender2Finished.countDown() },
+                onError = {}
+            )
+        }
+
+        assertTrue("Sender 2 must complete transmission", sender2Finished.await(20, TimeUnit.SECONDS))
+        assertTrue("Receiver 2 must finalize file and verify SHA-256", finishLatch.await(10, TimeUnit.SECONDS))
+
+        // Assert second run transmitted strictly less than 70% of the file over the wire
+        val bytesSentInSecondRun = sender2.bytesSentPerStream.values.sumOf { it.get() }
+        val maxAllowedBytes = (0.70 * fileSize).toLong()
+        assertTrue(
+            "Second run must send < 70% of file (sent $bytesSentInSecondRun bytes, threshold $maxAllowedBytes)",
+            bytesSentInSecondRun < maxAllowedBytes
+        )
+
+        // Verify final file
+        assertNotNull(receivedFinalFile)
+        assertTrue(receivedFinalFile!!.exists())
+        assertEquals("Final file size must equal 50 MB", fileSize, receivedFinalFile!!.length())
+        assertEquals("Final SHA-256 must match original file", expectedSha, computeSha256(receivedFinalFile!!))
+
+        // Verify .part and .part.meta were cleaned up after complete success
+        assertFalse("Temp .part file must be removed after successful commit", partFile.exists())
+        assertFalse("Temp .part.meta file must be removed after successful commit", metaFile.exists())
+    }
+
+    @Test(timeout = 60000)
+    fun testStaleMetaFileSizeChangedIsDiscardedSafely() = runBlocking {
+        val receiver = HighSpeedDataChannel()
+        val sender = HighSpeedDataChannel()
+        activeChannels.add(receiver)
+        activeChannels.add(sender)
+
+        val staleSize = 10L * 1024L * 1024L // 10 MB stale size
+        val realSize = 20L * 1024L * 1024L  // 20 MB real size
+        val fileName = "stale_test.bin"
+        val fileId = UUID.randomUUID().toString()
+
+        // Create stale .part and .part.meta in rxDir
+        val stalePart = File(rxDir, "$fileName.part").apply {
+            writeBytes(ByteArray(1024) { 0x55 })
+        }
+        val staleMeta = PartFileManager.getMetaFile(stalePart)
+        val stalePartMeta = com.swiftshare.nft.channel.models.PartFileMeta(
+            fileId = fileId,
+            fileName = fileName,
+            size = staleSize, // 10 MB (stale!)
+            chunkSize = HighSpeedDataChannel.CHUNK_SIZE,
+            totalChunks = (staleSize / HighSpeedDataChannel.CHUNK_SIZE).toInt(),
+            completedChunksBase64 = ""
+        )
+        PartFileManager.writeMeta(staleMeta, stalePartMeta)
+        assertTrue(stalePart.exists())
+        assertTrue(staleMeta.exists())
+
+        // Real transfer with 20 MB
+        val sourceFile = createSyntheticFile(txDir, fileName, realSize)
+        val expectedSha = computeSha256(sourceFile)
+        val manifestItem = FileManifestItem(fileId = fileId, name = fileName, size = realSize)
+        val token = "STALE_TOKEN"
+
+        val boundLatch = CountDownLatch(1)
+        val finishLatch = CountDownLatch(1)
+        var receivedFile: File? = null
+
+        receiver.startReceiverServer(
+            downloadDir = rxDir,
+            port = 0,
+            expectedSessionToken = token,
+            onBound = { boundLatch.countDown() },
+            onFileReceived = { file, _ ->
+                receivedFile = file
+                finishLatch.countDown()
+            }
+        )
+        assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
+        val port = receiver.serverPort
+        receiver.registerManifestItem(manifestItem)
+        receiver.notifyChecksumReceived(fileId, expectedSha)
+
+        sender.sendFileParallel(
+            targetIp = "127.0.0.1",
+            manifestItem = manifestItem,
+            sourceFile = sourceFile,
+            sessionToken = token,
+            port = port,
+            streamCount = 4,
+            onSuccess = {},
+            onError = {}
+        )
+
+        assertTrue(finishLatch.await(20, TimeUnit.SECONDS))
+        assertNotNull(receivedFile)
+        assertEquals(realSize, receivedFile!!.length())
+        assertEquals(expectedSha, computeSha256(receivedFile!!))
+    }
+
+    @Test(timeout = 60000)
+    fun testTwoDifferentFilesWithSameNameDoNotCollide() = runBlocking {
+        val fileName = "duplicate_name.bin"
+        val file1Id = "file-id-1"
+        val file2Id = "file-id-2"
+        val size1 = 128L * 1024L
+        val size2 = 256L * 1024L
+
+        // File 1 has partial download
+        val (part1, meta1) = PartFileManager.resolvePartFileAndMeta(rxDir, file1Id, fileName, size1)
+        part1.writeBytes(ByteArray(1024) { 0x11 })
+        val metaObj1 = com.swiftshare.nft.channel.models.PartFileMeta(
+            fileId = file1Id,
+            fileName = fileName,
+            size = size1,
+            chunkSize = HighSpeedDataChannel.CHUNK_SIZE,
+            totalChunks = 2,
+            completedChunksBase64 = ""
+        )
+        PartFileManager.writeMeta(meta1, metaObj1)
+        assertTrue("Part 1 must exist", part1.exists())
+        assertTrue("Meta 1 must exist", meta1.exists())
+
+        // File 2 arrives with identical fileName but different fileId
+        val (part2, meta2) = PartFileManager.resolvePartFileAndMeta(rxDir, file2Id, fileName, size2)
+
+        // Assert part2 is disambiguated and does not collide with part1
+        assertFalse("Part 2 must have a different path than Part 1", part1.absolutePath == part2.absolutePath)
+        assertTrue("Part 1 must still exist completely unmodified", part1.exists())
+        val meta1After = PartFileManager.readMeta(meta1)
+        assertNotNull(meta1After)
+        assertEquals("Meta 1 fileId must still be file-id-1", file1Id, meta1After!!.fileId)
+
+        // Verify part2 path ends with collision-safe disambiguation
+        assertTrue(
+            "Part 2 name must be disambiguated, e.g. duplicate_name (1).bin.part (was ${part2.name})",
+            part2.name.contains("(1)")
+        )
     }
 }

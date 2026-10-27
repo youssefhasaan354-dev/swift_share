@@ -76,8 +76,19 @@ class HighSpeedDataChannel {
     val receivedChecksums = ConcurrentHashMap<String, String>()
     val checksumLatches = ConcurrentHashMap<String, CountDownLatch>()
 
-    // Track active .part files for cleanup on cancel/failure
+    // Track active .part files and .part.meta files
     private val activePartFiles = ConcurrentHashMap<String, File>()
+    private val activeMetaFiles = ConcurrentHashMap<String, File>()
+
+    fun getResumeBitmap(downloadDir: File, fileId: String, fileName: String, totalSize: Long): BitSet? {
+        val (partFile, metaFile) = PartFileManager.resolvePartFileAndMeta(downloadDir, fileId, fileName, totalSize)
+        if (!partFile.exists() || !metaFile.exists()) return null
+        val meta = PartFileManager.readMeta(metaFile) ?: return null
+        if (meta.fileId != fileId || meta.size != totalSize) return null
+        return PartFileManager.base64ToBitSet(meta.completedChunksBase64, meta.totalChunks)
+    }
+
+    fun getReceivedBytes(fileId: String): Long = fileReceivedBytes[fileId]?.get() ?: 0L
 
     fun registerManifestItem(item: FileManifestItem) {
         activeManifestItems[item.fileId] = item
@@ -267,16 +278,35 @@ class HighSpeedDataChannel {
 
                 // Initialize shared state for this file if needed
                 val totalChunks = ((manifestItem?.size ?: 0L) + CHUNK_SIZE - 1) / CHUNK_SIZE
-                val bitmap = fileBitmaps.computeIfAbsent(header.fileId) { BitSet(totalChunks.toInt()) }
                 fileTotalChunks.putIfAbsent(header.fileId, totalChunks.toInt())
-                val receivedBytes = fileReceivedBytes.computeIfAbsent(header.fileId) { AtomicLong(0L) }
 
-                val sanitizedName = SafeFileName.sanitize(manifestItem?.name ?: header.fileId)
-                val partFile = activePartFiles.computeIfAbsent(header.fileId) {
-                    File(downloadDir, "$sanitizedName.part")
+                val (partFile, metaFile) = PartFileManager.resolvePartFileAndMeta(
+                    downloadDir = downloadDir,
+                    fileId = header.fileId,
+                    fileName = manifestItem?.name ?: header.fileId,
+                    totalSize = manifestItem?.size ?: 0L
+                )
+                activePartFiles.putIfAbsent(header.fileId, partFile)
+                activeMetaFiles.putIfAbsent(header.fileId, metaFile)
+
+                val bitmap = fileBitmaps.computeIfAbsent(header.fileId) {
+                    val diskMeta = PartFileManager.readMeta(metaFile)
+                    if (diskMeta != null && diskMeta.fileId == header.fileId && diskMeta.size == (manifestItem?.size ?: 0L)) {
+                        PartFileManager.base64ToBitSet(diskMeta.completedChunksBase64, totalChunks.toInt())
+                    } else {
+                        BitSet(totalChunks.toInt())
+                    }
                 }
+                val receivedBytes = fileReceivedBytes.computeIfAbsent(header.fileId) {
+                    AtomicLong(bitmap.cardinality().toLong() * CHUNK_SIZE)
+                }
+
                 val raf = fileRaStreams.computeIfAbsent(header.fileId) {
-                    RandomAccessFile(partFile, "rw")
+                    RandomAccessFile(partFile, "rw").apply {
+                        if (manifestItem != null && length() < manifestItem.size) {
+                            setLength(manifestItem.size)
+                        }
+                    }
                 }
 
                 // Read payload
@@ -295,19 +325,16 @@ class HighSpeedDataChannel {
                 }
 
                 val chunkIndex = (header.offset / CHUNK_SIZE).toInt()
-                var isDuplicate = false
-                synchronized(bitmap) {
-                    if (bitmap.get(chunkIndex)) {
-                        isDuplicate = true
-                    } else {
-                        bitmap.set(chunkIndex)
-                    }
-                }
+                val alreadyReceived = synchronized(bitmap) { bitmap.get(chunkIndex) }
 
-                if (!isDuplicate) {
-                    // Positional write via FileChannel
+                if (!alreadyReceived) {
+                    // Positional write via FileChannel directly to disk first
                     val writeBuf = ByteBuffer.wrap(payload)
                     raf.channel.write(writeBuf, header.offset)
+                    // Mark completed in bitmap ONLY AFTER bytes are safely written to disk
+                    synchronized(bitmap) {
+                        bitmap.set(chunkIndex)
+                    }
                     receivedBytes.addAndGet(header.length.toLong())
 
                     bytesReceivedPerStream.computeIfAbsent(header.streamId) { AtomicLong(0) }
@@ -321,11 +348,12 @@ class HighSpeedDataChannel {
                 }
 
                 if (isComplete && finished.compareAndSet(false, true)) {
-                    finalizeFileTransfer(header.fileId, manifestItem, partFile, raf, downloadDir, onFileReceived)
+                    finalizeFileTransfer(header.fileId, manifestItem, partFile, metaFile, raf, downloadDir, onFileReceived)
                 }
             }
         } finally {
             watchdogJob.cancel()
+            flushActiveMetaToDisk()
         }
     }
 
@@ -333,6 +361,7 @@ class HighSpeedDataChannel {
         fileId: String,
         manifestItem: FileManifestItem?,
         partFile: File,
+        metaFile: File,
         raf: RandomAccessFile,
         downloadDir: File,
         onFileReceived: (File, FileManifestItem) -> Unit
@@ -347,8 +376,6 @@ class HighSpeedDataChannel {
         val expectedSha = receivedChecksums[fileId]
 
         if (!received || expectedSha.isNullOrBlank()) {
-            partFile.delete()
-            activePartFiles.remove(fileId)
             throw IOException("FileChecksumMessage timeout or missing for fileId $fileId")
         }
 
@@ -364,12 +391,15 @@ class HighSpeedDataChannel {
         val actualSha = digest.digest().joinToString("") { "%02x".format(it) }
 
         if (!actualSha.equals(expectedSha, ignoreCase = true)) {
+            // Delete on final SHA-256 mismatch
             partFile.delete()
+            metaFile.delete()
             activePartFiles.remove(fileId)
+            activeMetaFiles.remove(fileId)
             throw IOException("SHA-256 mismatch! Expected $expectedSha but computed $actualSha")
         }
 
-        // SHA-256 matches: rename .part to final destination safely
+        // SHA-256 matches: rename .part to final destination safely and remove .meta
         val targetName = manifestItem?.name ?: partFile.name.removeSuffix(".part")
         val finalFile = SafeFileName.resolveUniqueFile(downloadDir, targetName)
         if (!partFile.renameTo(finalFile)) {
@@ -377,11 +407,22 @@ class HighSpeedDataChannel {
             partFile.copyTo(finalFile, overwrite = false)
             partFile.delete()
         }
+        metaFile.delete()
         activePartFiles.remove(fileId)
+        activeMetaFiles.remove(fileId)
 
         manifestItem?.let { onFileReceived(finalFile, it) }
     }
 
+    /**
+     * Legacy single-stream fallback handler for backwards compatibility with Flutter iOS companion
+     * and v1 single-stream clients.
+     *
+     * SECURITY PROOF:
+     * Enforces the session token via constant-time comparison [DataChannelHeader.validateToken]
+     * against [activeExpectedToken] before accepting or writing any file bytes. Unauthorized
+     * connections without a matching token are immediately closed.
+     */
     private fun handleLegacySingleStream(
         socketChannel: SocketChannel,
         downloadDir: File,
@@ -483,6 +524,7 @@ class HighSpeedDataChannel {
         batchId: String = "batch_default",
         port: Int = Constants.PORT_DATA,
         streamCount: Int = STREAM_COUNT,
+        resumeBitmap: BitSet? = null,
         onProgress: ((Long, Long) -> Unit)? = null,
         onSuccess: () -> Unit,
         onError: (Throwable) -> Unit
@@ -504,7 +546,8 @@ class HighSpeedDataChannel {
             isCancelled.set(false)
             val fileSize = sourceFile.length()
             val chunkCount = if (fileSize == 0L) 1 else ((fileSize + CHUNK_SIZE - 1) / CHUNK_SIZE).toInt()
-            val chunkQueue = ConcurrentLinkedQueue<Int>((0 until chunkCount).toList())
+            val remainingChunks = (0 until chunkCount).filter { resumeBitmap == null || !resumeBitmap.get(it) }
+            val chunkQueue = ConcurrentLinkedQueue<Int>(remainingChunks)
 
             // Connect 4 parallel streams and authenticate each
             val authLatch = CountDownLatch(streamCount)
@@ -539,7 +582,10 @@ class HighSpeedDataChannel {
                 throw IOException("Timed out establishing $streamCount parallel streams")
             }
 
-            val totalBytesTransferred = AtomicLong(0L)
+            val totalBytesTransferredThisRun = AtomicLong(0L)
+            val cumulativeTransferred = AtomicLong(
+                (resumeBitmap?.cardinality() ?: 0).toLong() * CHUNK_SIZE
+            )
             val raf = RandomAccessFile(sourceFile, "r")
 
             // Launch async SHA-256 calculation to send on control channel concurrently
@@ -593,10 +639,11 @@ class HighSpeedDataChannel {
                             }
 
                             lastProgress.set(System.currentTimeMillis())
-                            val transferred = totalBytesTransferred.addAndGet(length.toLong())
+                            totalBytesTransferredThisRun.addAndGet(length.toLong())
+                            val currentCumulative = cumulativeTransferred.addAndGet(length.toLong())
                             bytesSentPerStream.computeIfAbsent(streamIdx.toByte()) { AtomicLong(0) }
                                 .addAndGet(length.toLong())
-                            onProgress?.invoke(transferred, fileSize)
+                            onProgress?.invoke(currentCumulative, fileSize)
                         }
 
                         if (!isCancelled.get()) {
@@ -668,7 +715,7 @@ class HighSpeedDataChannel {
         }
     }
 
-    fun cancel() {
+    fun cancel(explicitUserCancel: Boolean = true) {
         isCancelled.set(true)
         serverJob?.cancel()
         scope.coroutineContext.cancelChildren()
@@ -686,19 +733,56 @@ class HighSpeedDataChannel {
             channelRegistry.clear()
         }
 
-        // Close open file streams and clean up incomplete .part files
-        fileRaStreams.values.forEach { try { it.close() } catch (_: Exception) {} }
-        fileRaStreams.clear()
-
-        activePartFiles.values.forEach { file ->
-            try {
-                if (file.exists()) file.delete()
-            } catch (_: Exception) {}
+        if (explicitUserCancel) {
+            // Explicit user cancel -> close raf and purge .part and .part.meta
+            fileRaStreams.values.forEach { try { it.close() } catch (_: Exception) {} }
+            fileRaStreams.clear()
+            activePartFiles.values.forEach { file ->
+                try {
+                    if (file.exists()) file.delete()
+                } catch (_: Exception) {}
+            }
+            activeMetaFiles.values.forEach { file ->
+                try {
+                    if (file.exists()) file.delete()
+                } catch (_: Exception) {}
+            }
+            activePartFiles.clear()
+            activeMetaFiles.clear()
+            fileBitmaps.clear()
+            fileTotalChunks.clear()
+            fileReceivedBytes.clear()
+            fileFinishedFlags.clear()
+        } else {
+            // Non-explicit cancel (e.g. socket drop) -> flush .part.meta to disk FIRST and KEEP .part!
+            flushActiveMetaToDisk()
+            fileRaStreams.values.forEach { try { it.close() } catch (_: Exception) {} }
+            fileRaStreams.clear()
         }
-        activePartFiles.clear()
-        fileBitmaps.clear()
-        fileTotalChunks.clear()
-        fileReceivedBytes.clear()
-        fileFinishedFlags.clear()
+    }
+
+    private fun flushActiveMetaToDisk() {
+        try {
+            fileRaStreams.values.forEach { try { it.fd.sync() } catch (_: Exception) {} }
+            fileBitmaps.forEach { (fid, bmap) ->
+                val mFile = activeMetaFiles[fid]
+                val item = activeManifestItems[fid]
+                val tChunks = fileTotalChunks[fid] ?: 0
+                if (mFile != null && item != null && tChunks > 0) {
+                    val base64 = synchronized(bmap) {
+                        PartFileManager.bitSetToBase64(bmap)
+                    }
+                    val meta = com.swiftshare.nft.channel.models.PartFileMeta(
+                        fileId = fid,
+                        fileName = item.name,
+                        size = item.size,
+                        chunkSize = CHUNK_SIZE,
+                        totalChunks = tChunks,
+                        completedChunksBase64 = base64
+                    )
+                    PartFileManager.writeMeta(mFile, meta)
+                }
+            }
+        } catch (_: Exception) {}
     }
 }

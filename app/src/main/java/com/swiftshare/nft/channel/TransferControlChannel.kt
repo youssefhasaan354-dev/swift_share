@@ -185,6 +185,16 @@ class TransferControlChannel {
         sendMessage(ControlMessage(type = MessageType.FILE_CHECKSUM, fileChecksum = checksumMsg))
     }
 
+    fun sendFileResumeRequest(batchId: String, fileId: String, chunkCount: Int, completedChunksBase64: String) {
+        val req = com.swiftshare.nft.channel.models.FileResumeRequest(
+            batchId = batchId,
+            fileId = fileId,
+            chunkCount = chunkCount,
+            completedChunksBase64 = completedChunksBase64
+        )
+        sendMessage(ControlMessage(type = MessageType.FILE_RESUME_REQUEST, fileResumeRequest = req))
+    }
+
     fun sendMessage(msg: ControlMessage) {
         scope.launch {
             try {

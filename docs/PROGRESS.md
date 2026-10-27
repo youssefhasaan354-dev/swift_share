@@ -136,11 +136,53 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
   - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
 - **Commit**: `eb6958c`
 
+### T2.3: Resumable Transfer Protocol (Wire Bitmap & On-Disk Metadata)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL 50MB LOOPBACK INTERRUPT/RESUME & NEGATIVE TESTS
+- **Verification Details**:
+  - **Failure Policy Overhaul**: On any socket disconnection, timeout, or stream drop, `.part` files are STRICTLY KEPT on disk. An accompanying `<name>.part.meta` metadata file is written/updated storing `fileId`, `fileName`, `size`, `chunkSize`, `totalChunks`, and `completedChunksBase64` (Base64 bitset). Deletion of `.part` occurs ONLY on explicit user cancel (`cancel(explicitUserCancel = true)`) or on final full-file SHA-256 verification mismatch.
+  - **Over-the-Wire Resume**: Added `FileResumeRequest` control message (`TransferControlChannel`) containing chunk bitmap. Sender populates chunk dispatch queue with missing chunk indices only (`filter { !resumeBitmap.get(it) }`), completely skipping already-transferred bytes.
+  - **Disk-Backed State**: Resume strictly loads verified chunk bitmaps from on-disk `<name>.part.meta` rather than relying on in-memory state.
+  - **50MB Interrupted Transfer Test**: Transferred 50 MB synthetic binary over loopback across 4 parallel streams. At ~40% completion, abruptly killed network sockets. Reconnected, verified resume bitmap loaded from disk, resumed transmission, and verified second run transmitted strictly < 70% of the total file over the wire. Final SHA-256 matched source file identically, and temporary `.part` and `.part.meta` were cleaned up.
+  - **Stale Metadata Protection**: If file size changes between sessions for the same file, stale `.part.meta` and `.part` are detected, safely discarded, and transmission restarts cleanly from chunk 0 with SHA-256 verified.
+  - **Name Collision Prevention**: When two different files share the identical file name (`manifestItem.name`), `PartFileManager.resolvePartFileAndMeta` disambiguates subsequent files with collision-free naming (e.g. `name (1).part`), ensuring parallel or sequential transfers never overwrite or corrupt partial files.
+  - **Legacy Single-Stream Audit**: Proved that `HighSpeedDataChannel.handleLegacySingleStream` strictly validates the session token via constant-time `DataChannelHeader.validateToken(activeExpectedToken, receivedToken)` before accepting data. Documented and preserved for legacy and iOS companion fallback.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/nft/channel/PartFileManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/nft/channel/HighSpeedDataChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/models/UserMessages.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
+- **Commit**: (Item B commit)
+
+---
+
+## Flutter iOS Companion Client Analysis & Architecture Proposal
+
+An architectural inspection was performed on `flutter_ios_companion/lib/services/swiftshare_ios_client.dart`:
+
+### What Breaks for iOS with Modern Protocol:
+1. **Port 2999 Protocol Incompatibility**: The iOS client expects an HTTP REST server on port 2999 (`/api/manifest`, `/api/download/{id}`, `/api/upload`). In T1.2, port 2999 was dedicated exclusively to raw TCP binary framing (`TransferControlChannel`, magic `0x53574654`). Any HTTP GET/POST from iOS to port 2999 immediately receives a socket reset or handshake error.
+2. **WebShare Port Separation**: The HTTP server runs on port 8080 (`Constants.PORT_WEB_SERVER`).
+3. **Authentication Boundary Mismatch**: The HTTP server requires PIN verification (`WebAuthManager`) with `SWIFTSHARE_SESSION` cookie. The iOS client transmits query parameter `?token=...`, which is rejected with 401 Unauthorized.
+4. **No 4-Stream Framing**: The iOS client has no implementation of the multi-stream binary socket framing (`SWSA` auth, `SWCK` chunking, per-chunk CRC32).
+
+### Architectural Proposal for iOS Support:
+- **Option 1: Serve iOS through the Web Portal (Recommended)**:
+  - iOS users simply open Safari to `http://<android-ip>:8080`, enter the 4-digit PIN displayed on Android's screen, and upload/download files directly via Safari's built-in WebKit file manager and download service.
+  - **Advantages**: Zero installation required for iPhone users, zero App Store review hurdles, full support for all file types, works across iOS, iPadOS, macOS, and Windows.
+- **Option 2: Modernize Flutter iOS Companion for WebShare REST API**:
+  - Update `swiftshare_ios_client.dart` to connect to port 8080 instead of 2999.
+  - Implement PIN authentication (`POST /api/auth` with `{ "pin": "..." }`) and maintain the session cookie.
+  - Retain HTTP multipart upload (`/api/upload`) and streaming download (`/api/download/{id}`) on port 8080.
+
+---
+
 ### Upcoming Phase 2 Tasks
 
-- **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
-- **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
+- **T2.4**: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`) & SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
+- **UI Hardening**: Transfer Offer/Accept dialog, free-space check (`NOT_ENOUGH_SPACE`), deduplication, cancel item/batch, presence heartbeat (3s/3 misses), Room history.
 
 ---
 
