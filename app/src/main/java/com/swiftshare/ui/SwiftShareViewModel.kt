@@ -145,12 +145,42 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                     }
                 )
 
+                var currentIncomingBatchId: String? = null
                 viewModelScope.launch(Dispatchers.IO) {
                     controlChannel.incomingMessages.collect { msg ->
                         when (msg.type) {
                             com.swiftshare.nft.channel.models.MessageType.TRANSFER_MANIFEST -> {
-                                msg.manifest?.files?.forEach { item ->
-                                    dataChannel.registerManifestItem(item)
+                                msg.manifest?.let { manifest ->
+                                    currentIncomingBatchId = manifest.batchId
+                                    val session = com.swiftshare.data.entities.SessionEntity(
+                                        sessionId = manifest.batchId,
+                                        peerName = activePeer.value?.deviceName ?: "Sender",
+                                        peerIp = payload.ip,
+                                        isIncoming = true,
+                                        totalFiles = manifest.fileCount,
+                                        totalBytes = manifest.totalBytes,
+                                        transferredBytes = 0L,
+                                        status = "IN_PROGRESS",
+                                        startTime = System.currentTimeMillis()
+                                    )
+                                    val items = manifest.files.map { mi ->
+                                        com.swiftshare.data.entities.TransferItemEntity(
+                                            sessionId = manifest.batchId,
+                                            fileId = mi.fileId,
+                                            name = mi.name,
+                                            size = mi.size,
+                                            mimeType = mi.mimeType,
+                                            transferredBytes = 0L,
+                                            status = "PENDING",
+                                            uriOrPath = mi.name
+                                        )
+                                    }
+                                    db.sessionDao().insertSession(session)
+                                    db.sessionDao().insertItems(items)
+
+                                    manifest.files.forEach { item ->
+                                        dataChannel.registerManifestItem(item)
+                                    }
                                 }
                             }
                             com.swiftshare.nft.channel.models.MessageType.FILE_CHECKSUM -> {
@@ -166,7 +196,8 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                 dataChannel.startReceiverServer(
                     expectedSessionToken = payload.sessionToken,
                     onFileReceived = { file, item ->
-                        recordTransfer(item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true)
+                        val bId = currentIncomingBatchId ?: "batch_incoming"
+                        recordTransfer(bId, item.fileId, item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true, status = "COMPLETED")
                     },
                     onError = { e ->
                         com.swiftshare.common.AppLogger.e("SwiftShareVM", "Receiver channel failed: ${e.message}", e, notifyUser = true)
@@ -212,6 +243,36 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                         thumbnailBase64 = generateThumbnailBase64(item)
                     )
                 }
+
+                // Record Outgoing Session & Items in Room
+                val session = com.swiftshare.data.entities.SessionEntity(
+                    sessionId = batchId,
+                    peerName = peer.deviceName,
+                    peerIp = peer.ip,
+                    isIncoming = false,
+                    totalFiles = manifestItems.size,
+                    totalBytes = totalBytes,
+                    transferredBytes = 0L,
+                    status = "IN_PROGRESS",
+                    startTime = System.currentTimeMillis()
+                )
+                val items = manifestItems.map { mi ->
+                    com.swiftshare.data.entities.TransferItemEntity(
+                        sessionId = batchId,
+                        fileId = mi.fileId,
+                        name = mi.name,
+                        size = mi.size,
+                        mimeType = mi.mimeType,
+                        transferredBytes = 0L,
+                        status = "PENDING",
+                        uriOrPath = mi.relativePath
+                    )
+                }
+                viewModelScope.launch(Dispatchers.IO) {
+                    db.sessionDao().insertSession(session)
+                    db.sessionDao().insertItems(items)
+                }
+
                 controlChannel.sendManifest(
                     TransferManifest(
                         batchId = batchId,
@@ -223,6 +284,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
 
                 viewModelScope.launch(Dispatchers.IO) {
                     var cumulative = 0L
+                    var failedCount = 0
                     for ((index, item) in files.withIndex()) {
                         val file = File(item.path)
                         val manifestItem = manifestItems.getOrNull(index) ?: FileManifestItem(
@@ -241,17 +303,21 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                 batchId = batchId,
                                 streamCount = 4,
                                 onSuccess = {
-                                    recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
+                                    recordTransfer(batchId, manifestItem.fileId, item.name, item.path, item.size, item.mimeType, isIncoming = false, status = "COMPLETED")
                                     controlChannel.sendStatusAck(batchId, manifestItem.fileId, FileTransferStatus.COMPLETED, item.size)
                                 },
                                 onError = { e ->
+                                    failedCount++
                                     com.swiftshare.common.AppLogger.e("SwiftShareVM", "File transfer failed (${item.name}): ${e.message}", e, notifyUser = true)
+                                    recordTransfer(batchId, manifestItem.fileId, item.name, item.path, item.size, item.mimeType, isIncoming = false, status = "FAILED")
                                     controlChannel.sendStatusAck(batchId, manifestItem.fileId, FileTransferStatus.FAILED, 0L)
                                 }
                             )
                             cumulative += item.size
                         }
                     }
+                    val finalStatus = if (failedCount == 0) "COMPLETED" else "FAILED"
+                    db.sessionDao().updateSessionStatus(batchId, finalStatus, cumulative, System.currentTimeMillis())
                 }
             },
             onError = { err ->
@@ -261,29 +327,44 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
     }
 
 
-    private fun recordTransfer(fileName: String, path: String, size: Long, mime: String, isIncoming: Boolean) {
+    private fun recordTransfer(
+        batchId: String,
+        fileId: String,
+        fileName: String,
+        path: String,
+        size: Long,
+        mime: String,
+        isIncoming: Boolean,
+        status: String = "COMPLETED"
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             val record = TransferRecordEntity(
-                batchId = "batch_record",
-                fileId = UUID.randomUUID().toString(),
+                batchId = batchId,
+                fileId = fileId,
                 fileName = fileName,
                 filePath = path,
                 fileSize = size,
                 mimeType = mime,
                 isIncoming = isIncoming,
-                status = "COMPLETED",
+                status = status,
                 peerName = activePeer.value?.deviceName ?: "Peer",
                 timestamp = System.currentTimeMillis()
             )
             db.transferDao().insert(record)
+            db.sessionDao().updateItemStatus(batchId, fileId, status, if (status == "COMPLETED") size else 0L)
         }
     }
 
-    fun cancelTransfer() {
+    fun cancelTransfer(batchId: String? = null) {
         controlChannel.close()
-        dataChannel.cancel()
+        dataChannel.cancel(explicitUserCancel = true)
         TransferForegroundService.stopService(getApplication())
         QrPayloadManager.unbindProcessNetwork(getApplication())
+        batchId?.let { id ->
+            viewModelScope.launch(Dispatchers.IO) {
+                db.sessionDao().updateSessionStatus(id, "CANCELLED", 0L, System.currentTimeMillis())
+            }
+        }
     }
 
     override fun onCleared() {

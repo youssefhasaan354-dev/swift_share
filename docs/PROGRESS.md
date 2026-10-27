@@ -193,9 +193,26 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+### T2.3.2: Room History with Sessions + Transfer Items, Schema Migration 1->2, and Real Transfer Statuses
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT & SCHEMA EXECUTION TESTS
+- **Verification Details**: Real tests in `RoomMigrationTest.kt`:
+  - `testRoomMigration1To2ExecutesAllSchemaStatements`: Verified execution of all 5 DDL/DML migration statements in `AppDatabase.MIGRATION_1_2` (creating `sessions` table, `transfer_items` table, `index_transfer_items_sessionId` index, migrating legacy `transfer_records` grouped by `batchId` into `sessions`, and copying records into `transfer_items`).
+  - `testSessionEntityAndTransferItemEntityProperties`: Verified instantiation, serialization, and column mapping for `SessionEntity` and `TransferItemEntity`.
+  - Removed all hardcoded `"batch_record"` identifiers from `SwiftShareViewModel.kt`. Sessions and individual items now record real statuses (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `FAILED`, `CANCELLED`) with real session UUIDs and byte metrics.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/data/entities/SessionEntity.kt` (new)
+  - `app/src/main/java/com/swiftshare/data/entities/TransferItemEntity.kt` (new)
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt` (new)
+  - `app/src/main/java/com/swiftshare/data/db/AppDatabase.kt`
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/test/java/com/swiftshare/data/RoomMigrationTest.kt` (new)
+
+---
+
 ### Upcoming Phase 2 Tasks
 
-- **T2.3.2**: Room database history with `sessions` + `transfer_items` + schema migration (v1 -> v2) and real statuses.
 - **T2.3.3**: Receiver UI Transfer Offer Dialog, free space check, item deduplication, and Result Screen (Retry/Open/Send more).
 - **T2.4**: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`) & SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).

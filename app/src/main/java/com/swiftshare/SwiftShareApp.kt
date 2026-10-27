@@ -26,7 +26,9 @@ class SwiftShareApp : Application() {
             applicationContext,
             AppDatabase::class.java,
             "swiftshare.db"
-        ).fallbackToDestructiveMigration().build()
+        ).addMigrations(AppDatabase.MIGRATION_1_2)
+         .fallbackToDestructiveMigration()
+         .build()
 
         createNotificationChannels()
         com.swiftshare.common.LocaleManager.init(this)
