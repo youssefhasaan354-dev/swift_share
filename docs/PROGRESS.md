@@ -116,8 +116,20 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
   - `app/src/test/java/com/swiftshare/nft/channel/TransferControlChannelTest.kt`
 - **Commit**: `a6a8cd4`
 
+### T2.2: 4 Parallel Streams & Non-Blocking NIO with Real Socket Timeouts
+- **Status**: IN PROGRESS
+- **Architectural Decisions**:
+  - **(a) Timeouts & Watchdog**: `soTimeout` (15s) protects reads; an active watchdog tracks `lastProgressTimestamp` for both reads/writes and forcibly closes the socket after timeout (injectable `watchdogTimeoutMs`) to unblock hanging threads.
+  - **(b) File Completion**: Received chunks tracked via synchronized `BitSet` rejecting duplicate chunks. Completion requires all chunk bits set + full-file SHA-256 match; `isEof` header flag only denotes stream finish.
+  - **(c) Checksum & Limitation**: Receiver waits for async `FileChecksumMessage` on control channel after last chunk; fails closed (deletes `.part`) if timed out or mismatched. Limitation: CRC32/SHA-256 detect corruption, not active tampering, since transport is cleartext and session token is the sole auth boundary.
+  - **(d) Defensive Header Bounds**: Rejects `offset < 0`, `offset % 64KB != 0`, `offset >= fileSize`, `length != expectedLength`, or unknown `fileId`. Enforced with boundary tests (negative, Long.MAX_VALUE, offset == size).
+  - **(e) Chunk Distribution & Failure Policy**: Shared thread-safe queue across 4 streams; workers start pulling only after all 4 streams authenticate so every stream carries bytes. 5th connection rejected. Failure policy v1: any stream failure aborts the entire transfer cleanly.
+  - **(f) Storage Writing & Reading**: Direct `FileChannel` positional writes (`RandomAccessFile.channel.write`) verified on JVM. MediaStore (`IS_PENDING`) and SAF `ParcelFileDescriptor` (`Os.pwrite`) marked "NOT VERIFIED (needs device)". Sender reads from `FileChannel` / `ParcelFileDescriptor`.
+  - **(g) TransferManifest & Safe Paths**: `FileManifestItem` holds `fileId` and `size`. `.part` and target files use `SafeFileName` deduplication without overwriting. Any write `IOException` cleanly aborts and deletes `.part`.
+  - **(h) Leak Prevention**: Injected channel registry asserts all channels `isOpen == false`, port is immediately re-bindable, and active thread count returns to baseline within 5s polling.
+  - **(i) Throughput & Watchdog Test**: 100MB synthetic loopback benchmarks 1-stream vs 4-stream speed (noting loopback != Wi-Fi). Watchdog test asserts stalled peer causes sender failure in `< watchdogTimeoutMs`.
+
 ### Upcoming Phase 2 Tasks
-- **T2.2**: 4 Parallel Streams & Non-Blocking NIO with Real Socket Timeouts.
 - **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
 - **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
