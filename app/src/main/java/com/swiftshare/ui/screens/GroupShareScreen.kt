@@ -85,6 +85,7 @@ fun GroupShareScreen(
     val groupEngine = remember { GroupShareEngine(dataChannel) }
     val currentRoom by groupEngine.currentRoom.collectAsState()
     val broadcastStatus by groupEngine.broadcastStatus.collectAsState()
+    val memberProgress by groupEngine.memberProgress.collectAsState()
 
     val discoveryManager = remember { DeviceDiscoveryManager(context) }
     val discoveredPeers by discoveryManager.allDiscoveredPeers.collectAsState()
@@ -432,13 +433,38 @@ fun GroupShareScreen(
                             Text(member.deviceName.take(1).uppercase(), fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(member.deviceName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
                             Text(
                                 if (member.id == room.hostDevice.id) "Portal Host (Group Owner)" else "Room Member",
                                 fontSize = 10.sp,
                                 color = TextSecondary
                             )
+                            val prog = memberProgress[member.id]
+                            if (prog != null && prog.status != com.swiftshare.nft.channel.models.FileTransferStatus.PENDING) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                when (prog.status) {
+                                    com.swiftshare.nft.channel.models.FileTransferStatus.TRANSFERRING -> {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            androidx.compose.material3.LinearProgressIndicator(
+                                                progress = { prog.percent / 100f },
+                                                modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                                color = AccentCyan,
+                                                trackColor = SurfaceBorderDark
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("${prog.percent}%", fontSize = 10.sp, color = AccentCyan)
+                                        }
+                                    }
+                                    com.swiftshare.nft.channel.models.FileTransferStatus.COMPLETED -> {
+                                        Text("✓ Completed (${com.swiftshare.common.NetworkUtils.formatBytes(prog.totalBytes)})", fontSize = 10.sp, color = AccentCyan)
+                                    }
+                                    com.swiftshare.nft.channel.models.FileTransferStatus.FAILED -> {
+                                        Text("✗ Failed: ${prog.errorMessage ?: ""}", fontSize = 10.sp, color = androidx.compose.ui.graphics.Color.Red)
+                                    }
+                                    else -> {}
+                                }
+                            }
                         }
                     }
                 }

@@ -281,10 +281,30 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+### T2.6: Group Share Multi-Receiver Session Engine with Per-Receiver Progress
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL CONCURRENT LOOPBACK TESTS (`GroupShareEngineTest.kt`)
+- **Verification Details**:
+  - **Verified by Real JVM Test (`GroupShareEngineTest.testBroadcastToOneSenderAndTwoLoopbackReceivers`)**:
+    - Concurrently bound Receiver 1 (ephemeral port, token 1) and Receiver 2 (ephemeral port, token 2) on loopback.
+    - Host device created a room with both receivers added as members.
+    - Broadcasted a synthetic 2 MB file using dedicated parallel session channels for each receiver in star topology.
+    - Verified full receipt within 30s timeout on both receivers.
+    - Verified SHA-256 integrity matches original on both Receiver 1 and Receiver 2.
+    - Verified `memberProgress` contains isolated, accurate per-receiver metrics (`FileTransferStatus.COMPLETED`, `transferredBytes == 2MB`) for both members independently.
+  - **UI Integration**:
+    - `GroupShareScreen`: Each member card observes `groupEngine.memberProgress` and renders an individual progress indicator and status banner (progress %, completion size, or error message).
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/groupshare/GroupShareEngine.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/GroupShareScreen.kt`
+  - `app/src/test/java/com/swiftshare/groupshare/GroupShareEngineTest.kt`
+- **Commit**: Current commit
+
+---
+
 ### Upcoming Phase 2 Tasks
 
-- **T2.6**: Group Share on new engine (one sender, several receivers, per-receiver progress, loopback test).
-- **Phase 2 Gate**: Full suite verification, lintDebug 0 errors, branch to `feat/phase-3`.
+- **Phase 2 Gate**: Full suite verification (`./gradlew assembleDebug lintDebug testDebugUnitTest --rerun-tasks`), record metrics in `PROGRESS.md`, create branch `feat/phase-3` from `feat/phase-2`.
 
 ---
 
