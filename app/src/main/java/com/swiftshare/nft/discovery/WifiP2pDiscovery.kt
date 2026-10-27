@@ -16,9 +16,14 @@ import android.os.Build
 import android.os.Looper
 import com.swiftshare.nft.discovery.models.PeerConnectionType
 import com.swiftshare.nft.discovery.models.PeerDevice
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class WifiP2pDiscovery(private val context: Context) {
 
@@ -129,6 +134,98 @@ class WifiP2pDiscovery(private val context: Context) {
         })
     }
 
+    @SuppressLint("MissingPermission")
+    fun cancelConnect() {
+        manager?.cancelConnect(channel, null)
+    }
+
+    /**
+     * Connects to a Wi-Fi Direct peer, monitors connectionInfo, and resolves the
+     * group owner IP address with an explicit timeout.
+     */
+    @SuppressLint("MissingPermission")
+    fun connectAndResolveHost(
+        deviceAddress: String,
+        timeoutMs: Long = 20_000L,
+        scope: kotlinx.coroutines.CoroutineScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO),
+        onSuccess: (hostIp: String) -> Unit,
+        onFailure: (errorMessage: String) -> Unit
+    ) {
+        val mgr = manager
+        val ch = channel
+        if (mgr == null || ch == null) {
+            onFailure("Wi-Fi Direct is not available on this device.")
+            return
+        }
+
+        var isCompleted = false
+        val lock = Any()
+
+        fun completeOnce(action: () -> Unit) {
+            synchronized(lock) {
+                if (!isCompleted) {
+                    isCompleted = true
+                    action()
+                }
+            }
+        }
+
+        var observerJob: kotlinx.coroutines.Job? = null
+        val timeoutJob = scope.launch {
+            kotlinx.coroutines.delay(timeoutMs)
+            completeOnce {
+                observerJob?.cancel()
+                cancelConnect()
+                onFailure("Wi-Fi Direct connection timed out. Please verify receiver accepted connection or use QR code.")
+            }
+        }
+
+        observerJob = scope.launch {
+            connectionInfo.collect { info ->
+                val hostIp = resolveHostIp(info)
+                if (hostIp != null) {
+                    completeOnce {
+                        timeoutJob.cancel()
+                        observerJob?.cancel()
+                        onSuccess(hostIp)
+                    }
+                }
+            }
+        }
+
+        val config = WifiP2pConfig().apply {
+            this.deviceAddress = deviceAddress
+        }
+
+        try {
+            mgr.connect(ch, config, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    // Connection initiated, awaiting broadcast & WifiP2pInfo
+                }
+
+                override fun onFailure(reason: Int) {
+                    completeOnce {
+                        timeoutJob.cancel()
+                        observerJob?.cancel()
+                        onFailure(mapFailureReason(reason))
+                    }
+                }
+            })
+        } catch (e: SecurityException) {
+            completeOnce {
+                timeoutJob.cancel()
+                observerJob?.cancel()
+                onFailure("Nearby Wi-Fi devices permission required for Wi-Fi Direct.")
+            }
+        } catch (e: Exception) {
+            completeOnce {
+                timeoutJob.cancel()
+                observerJob?.cancel()
+                onFailure("Wi-Fi Direct error: ${e.message}")
+            }
+        }
+    }
+
     fun removeGroup() {
         manager?.removeGroup(channel, null)
         _groupInfo.value = null
@@ -145,5 +242,24 @@ class WifiP2pDiscovery(private val context: Context) {
         } catch (_: Exception) {}
         stopDiscovery()
         removeGroup()
+    }
+
+    companion object {
+        fun resolveHostIp(info: WifiP2pInfo?): String? {
+            if (info == null || !info.groupFormed || info.groupOwnerAddress == null) {
+                return null
+            }
+            val addr = info.groupOwnerAddress.hostAddress
+            return if (!addr.isNullOrBlank()) addr else "192.168.49.1"
+        }
+
+        fun mapFailureReason(reason: Int): String {
+            return when (reason) {
+                WifiP2pManager.P2P_UNSUPPORTED -> "Wi-Fi Direct is unsupported on this device."
+                WifiP2pManager.BUSY -> "Wi-Fi Direct service is busy. Please try again."
+                WifiP2pManager.ERROR -> "Failed to establish Wi-Fi Direct connection."
+                else -> "Wi-Fi Direct connection failed (code $reason)."
+            }
+        }
     }
 }

@@ -68,7 +68,9 @@ data class AppStrings(
     val groupDesc: String,
     val groupLeave: String,
     val groupMembers: String,
-    val groupBroadcastBtn: String
+    val groupBroadcastBtn: String,
+    val connectingWifiDirect: String,
+    val acceptPromptOnOtherDevice: String
 )
 
 val EnglishStrings = AppStrings(
@@ -124,7 +126,9 @@ val EnglishStrings = AppStrings(
     groupDesc = "Host broadcasts files simultaneously to all connected room members.",
     groupLeave = "Leave Room",
     groupMembers = "Connected Members",
-    groupBroadcastBtn = "Select Files to Broadcast"
+    groupBroadcastBtn = "Select Files to Broadcast",
+    connectingWifiDirect = "Connecting via Wi-Fi Direct…",
+    acceptPromptOnOtherDevice = "Please accept the connection prompt on the other device."
 )
 
 val ArabicStrings = AppStrings(
@@ -180,7 +184,9 @@ val ArabicStrings = AppStrings(
     groupDesc = "يبث المضيف الملفات في نفس الوقت لجميع الأعضاء المنضمين للغرفة.",
     groupLeave = "مغادرة الغرفة",
     groupMembers = "الأعضاء المتصلون",
-    groupBroadcastBtn = "اختيار ملفات للبث الجماعي"
+    groupBroadcastBtn = "اختيار ملفات للبث الجماعي",
+    connectingWifiDirect = "جارٍ الاتصال عبر Wi-Fi Direct…",
+    acceptPromptOnOtherDevice = "يرجى قبول طلب الاتصال على الجهاز الآخر."
 )
 
 val LocalAppStrings = compositionLocalOf { EnglishStrings }

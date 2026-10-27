@@ -93,4 +93,6 @@
     <string name="qr_tab_app">رمز التطبيق QR</string>
     <string name="qr_tab_wifi">رمز Wi-Fi QR</string>
     <string name="qr_tab_web">رابط WebShare</string>
+    <string name="connecting_wifi_direct">جارٍ الاتصال عبر Wi-Fi Direct…</string>
+    <string name="accept_prompt_on_other_device">يرجى قبول طلب الاتصال على الجهاز الآخر.</string>
 </resources>

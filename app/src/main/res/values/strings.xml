@@ -93,4 +93,6 @@
     <string name="qr_tab_app">App QR</string>
     <string name="qr_tab_wifi">Wi-Fi QR</string>
     <string name="qr_tab_web">WebShare URL</string>
+    <string name="connecting_wifi_direct">Connecting via Wi-Fi Direct…</string>
+    <string name="accept_prompt_on_other_device">Please accept the connection prompt on the other device.</string>
 </resources>

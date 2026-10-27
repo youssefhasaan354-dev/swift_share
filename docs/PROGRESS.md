@@ -256,9 +256,33 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+### T2.5: Wi-Fi Direct UI Orchestration, Group Owner IP Resolution & Timeout Handling
+- **Status**: DONE
+- **Verification Mode**: MIXED (REAL JVM UNIT TESTS + NOT VERIFIED ON PHYSICAL HARDWARE)
+- **Verification Details**:
+  - **Verified by Real JVM Tests (`WifiP2pOrchestrationTest.kt`)**:
+    - Failure Reason Mapping: Verified exact mapping of `WifiP2pManager` codes (`P2P_UNSUPPORTED`, `BUSY`, `ERROR`, and fallback codes) to user-friendly diagnostic messages under `@Test(timeout = 60000)`.
+    - Group Owner IP Resolution: Verified pure functional resolution of group owner IP from `WifiP2pInfo` (`resolveHostIp`) handles null info, unformed groups, and missing owner addresses cleanly without throwing.
+  - **NOT VERIFIED (NEEDS PHYSICAL HARDWARE)**:
+    - Real Wi-Fi Direct P2P radio negotiation across two physical devices via `manager.connect` and `WIFI_P2P_CONNECTION_CHANGED_ACTION` broadcast.
+    - User acceptance prompt on receiving device.
+  - **UI Orchestration**:
+    - `RadarScanScreen`: When selecting a P2P peer, initiates `connectAndResolveHost`, shows a connecting dialog with localized Arabic/English copy ("Connecting via Wi-Fi Direct...", "Please accept prompt on other device"), and provides a Cancel button that safely invokes `cancelConnect()`.
+    - Upon resolution of group owner IP, copies peer with resolved IP and invokes `onPeerConnected`.
+    - Errors during initiation or timeout (20s) dispatch directly to `AppLogger.e(..., notifyUser = true)`.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/nft/discovery/WifiP2pDiscovery.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/RadarScanScreen.kt`
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/res/values/strings.xml`
+  - `app/src/main/res/values-ar/strings.xml`
+  - `app/src/test/java/com/swiftshare/nft/discovery/WifiP2pOrchestrationTest.kt`
+- **Commit**: Current commit
+
+---
+
 ### Upcoming Phase 2 Tasks
 
-- **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice` with `WifiP2pInfo` group owner IP).
 - **T2.6**: Group Share on new engine (one sender, several receivers, per-receiver progress, loopback test).
 - **Phase 2 Gate**: Full suite verification, lintDebug 0 errors, branch to `feat/phase-3`.
 

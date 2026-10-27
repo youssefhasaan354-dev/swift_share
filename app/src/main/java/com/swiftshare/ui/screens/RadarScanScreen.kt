@@ -73,6 +73,8 @@ fun RadarScanScreen(
 
     var showCameraScanner by remember { mutableStateOf(false) }
     var showQrDialog by remember { mutableStateOf(false) }
+    var isConnectingP2p by remember { mutableStateOf(false) }
+    var connectingDeviceName by remember { mutableStateOf("") }
 
     LaunchedEffect(isReceiverMode) {
         if (isReceiverMode) {
@@ -227,7 +229,25 @@ fun RadarScanScreen(
                         peers = discoveredPeers,
                         myDeviceName = Build.MODEL,
                         onPeerSelected = { peer ->
-                            onPeerConnected(peer)
+                            if (peer.connectionType == com.swiftshare.nft.discovery.models.PeerConnectionType.WIFI_DIRECT) {
+                                isConnectingP2p = true
+                                connectingDeviceName = peer.deviceName
+                                discoveryManager.wifiP2p.connectAndResolveHost(
+                                    deviceAddress = peer.id,
+                                    timeoutMs = 20_000L,
+                                    onSuccess = { resolvedIp ->
+                                        isConnectingP2p = false
+                                        val connectedPeer = peer.copy(ip = resolvedIp)
+                                        onPeerConnected(connectedPeer)
+                                    },
+                                    onFailure = { errorMsg ->
+                                        isConnectingP2p = false
+                                        com.swiftshare.common.AppLogger.e("WifiP2p", errorMsg, notifyUser = true)
+                                    }
+                                )
+                            } else {
+                                onPeerConnected(peer)
+                            }
                         }
                     )
                 }
@@ -248,6 +268,47 @@ fun RadarScanScreen(
                     color = TextSecondary
                 )
             }
+        }
+
+        // Wi-Fi Direct Connecting Progress Dialog
+        if (isConnectingP2p) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {
+                    discoveryManager.wifiP2p.cancelConnect()
+                    isConnectingP2p = false
+                },
+                title = {
+                    Text(text = strings.connectingWifiDirect, fontWeight = FontWeight.Bold, color = TextPrimary)
+                },
+                text = {
+                    Column {
+                        Text(
+                            text = connectingDeviceName,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AccentCyan,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = strings.acceptPromptOnOtherDevice,
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            discoveryManager.wifiP2p.cancelConnect()
+                            isConnectingP2p = false
+                        }
+                    ) {
+                        Text(strings.cancel, color = AccentCyan)
+                    }
+                },
+                containerColor = SurfaceDark
+            )
         }
 
         // Receiver QR Code Dialog
