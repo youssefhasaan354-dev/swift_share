@@ -145,6 +145,24 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                     }
                 )
 
+                viewModelScope.launch(Dispatchers.IO) {
+                    controlChannel.incomingMessages.collect { msg ->
+                        when (msg.type) {
+                            com.swiftshare.nft.channel.models.MessageType.TRANSFER_MANIFEST -> {
+                                msg.manifest?.files?.forEach { item ->
+                                    dataChannel.registerManifestItem(item)
+                                }
+                            }
+                            com.swiftshare.nft.channel.models.MessageType.FILE_CHECKSUM -> {
+                                msg.fileChecksum?.let { cs ->
+                                    dataChannel.notifyChecksumReceived(cs.fileId, cs.sha256)
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+
                 dataChannel.startReceiverServer(
                     expectedSessionToken = payload.sessionToken,
                     onFileReceived = { file, item ->
@@ -214,13 +232,14 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                             mimeType = item.mimeType
                         )
                         if (file.exists()) {
-                            dataChannel.sendFile(
+                            dataChannel.sendFileParallel(
                                 targetIp = peer.ip,
                                 manifestItem = manifestItem,
                                 sourceFile = file,
-                                batchTotalBytes = totalBytes,
-                                cumulativeBytesStart = cumulative,
                                 sessionToken = peer.sessionToken,
+                                controlChannel = controlChannel,
+                                batchId = batchId,
+                                streamCount = 4,
                                 onSuccess = {
                                     recordTransfer(item.name, item.path, item.size, item.mimeType, isIncoming = false)
                                     controlChannel.sendStatusAck(batchId, manifestItem.fileId, FileTransferStatus.COMPLETED, item.size)
@@ -240,6 +259,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
             }
         )
     }
+
 
     private fun recordTransfer(fileName: String, path: String, size: Long, mime: String, isIncoming: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {

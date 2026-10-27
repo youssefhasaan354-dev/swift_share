@@ -176,6 +176,15 @@ class TransferControlChannel {
         sendMessage(ControlMessage(type = MessageType.FILE_STATUS_ACK, statusAck = ack))
     }
 
+    fun sendFileChecksum(batchId: String, fileId: String, sha256: String) {
+        val checksumMsg = com.swiftshare.nft.channel.models.FileChecksumMessage(
+            batchId = batchId,
+            fileId = fileId,
+            sha256 = sha256
+        )
+        sendMessage(ControlMessage(type = MessageType.FILE_CHECKSUM, fileChecksum = checksumMsg))
+    }
+
     fun sendMessage(msg: ControlMessage) {
         scope.launch {
             try {

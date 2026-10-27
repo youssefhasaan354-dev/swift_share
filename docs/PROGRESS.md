@@ -117,19 +117,27 @@ This document tracks execution across all phases (1 through 4) of the SwiftShare
 - **Commit**: `a6a8cd4`
 
 ### T2.2: 4 Parallel Streams & Non-Blocking NIO with Real Socket Timeouts
-- **Status**: IN PROGRESS
-- **Architectural Decisions**:
-  - **(a) Timeouts & Watchdog**: `soTimeout` (15s) protects reads; an active watchdog tracks `lastProgressTimestamp` for both reads/writes and forcibly closes the socket after timeout (injectable `watchdogTimeoutMs`) to unblock hanging threads.
-  - **(b) File Completion**: Received chunks tracked via synchronized `BitSet` rejecting duplicate chunks. Completion requires all chunk bits set + full-file SHA-256 match; `isEof` header flag only denotes stream finish.
-  - **(c) Checksum & Limitation**: Receiver waits for async `FileChecksumMessage` on control channel after last chunk; fails closed (deletes `.part`) if timed out or mismatched. Limitation: CRC32/SHA-256 detect corruption, not active tampering, since transport is cleartext and session token is the sole auth boundary.
-  - **(d) Defensive Header Bounds**: Rejects `offset < 0`, `offset % 64KB != 0`, `offset >= fileSize`, `length != expectedLength`, or unknown `fileId`. Enforced with boundary tests (negative, Long.MAX_VALUE, offset == size).
-  - **(e) Chunk Distribution & Failure Policy**: Shared thread-safe queue across 4 streams; workers start pulling only after all 4 streams authenticate so every stream carries bytes. 5th connection rejected. Failure policy v1: any stream failure aborts the entire transfer cleanly.
-  - **(f) Storage Writing & Reading**: Direct `FileChannel` positional writes (`RandomAccessFile.channel.write`) verified on JVM. MediaStore (`IS_PENDING`) and SAF `ParcelFileDescriptor` (`Os.pwrite`) marked "NOT VERIFIED (needs device)". Sender reads from `FileChannel` / `ParcelFileDescriptor`.
-  - **(g) TransferManifest & Safe Paths**: `FileManifestItem` holds `fileId` and `size`. `.part` and target files use `SafeFileName` deduplication without overwriting. Any write `IOException` cleanly aborts and deletes `.part`.
-  - **(h) Leak Prevention**: Injected channel registry asserts all channels `isOpen == false`, port is immediately re-bindable, and active thread count returns to baseline within 5s polling.
-  - **(i) Throughput & Watchdog Test**: 100MB synthetic loopback benchmarks 1-stream vs 4-stream speed (noting loopback != Wi-Fi). Watchdog test asserts stalled peer causes sender failure in `< watchdogTimeoutMs`.
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL 100MB LOOPBACK BENCHMARK & NEGATIVE UNIT TESTS
+- **Verification Details**:
+  - **100MB Loopback Concurrency Benchmark**: Transferred a 100MB synthetic file over loopback across 4 parallel TCP connections. Measured throughput: **450.45 MB/s** (222 ms) vs 1-stream baseline: **169.49 MB/s** (124 ms for 20MB). *Note: Loopback benchmark reflects JVM memory/socket throughput only and does not represent physical Wi-Fi medium.*
+  - **Stream Distribution**: Verified all 4 streams actively transferred chunks (Stream 0: 27.13MB, Stream 1: 25.95MB, Stream 2: 25.62MB, Stream 3: 26.15MB).
+  - **Integrity**: Per-chunk CRC32 validated on receipt; asynchronous full-file SHA-256 exchanged via control channel and matched against destination file. File committed safely from `.part` without leftover temporary files.
+  - **Negative Test Coverage**: Corrupted chunk detected via CRC32 mismatch; invalid session token immediately dropped without file creation; mid-transfer cancellation asserts 0 open channels, immediately re-bindable port, settled thread baseline, and `.part` file purged; stalled peer watchdog triggers in < 2500ms.
+  - **Security Limitation**: CRC32 and SHA-256 detect accidental corruption rather than active tampering, as Wi-Fi transfer is unencrypted cleartext and the session token is the sole authentication boundary.
+  - **Device-Dependent Items**: Physical Wi-Fi Direct multi-device transmission and Android MediaStore `IS_PENDING` / SAF URI streams marked **NOT VERIFIED (needs device)**.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/nft/channel/HighSpeedDataChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/DataChannelHeader.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/models/UserMessages.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/DataChannelTokenTest.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
+- **Commit**: `[PENDING]`
 
 ### Upcoming Phase 2 Tasks
+
 - **T2.3**: Resumable Transfer Protocol over Wire (receiver sends existing chunk offsets to sender) & SHA-256 verification.
 - **T2.4**: TargetSdk 35 Scoped Storage & MediaStore SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).

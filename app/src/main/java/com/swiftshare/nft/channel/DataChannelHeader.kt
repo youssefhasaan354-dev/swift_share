@@ -138,7 +138,7 @@ data class StreamAuthHeader(
     }
 
     companion object {
-        val MAGIC_BYTES = byteArrayOf('S'.code.toByte(), 'W'.code.toByte(), 'F'.code.toByte(), 'T'.code.toByte())
+        val MAGIC_BYTES = byteArrayOf('S'.code.toByte(), 'W'.code.toByte(), 'S'.code.toByte(), 'A'.code.toByte())
 
         fun parse(buffer: ByteBuffer): StreamAuthHeader? {
             if (buffer.remaining() < 4) return null
