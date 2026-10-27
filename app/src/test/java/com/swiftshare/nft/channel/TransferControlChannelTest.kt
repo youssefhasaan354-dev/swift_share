@@ -210,4 +210,250 @@ class TransferControlChannelTest {
             client.close()
         }
     }
+
+    @Test(timeout = 60000)
+    fun testTransferOfferAndAcceptResponse() = runBlocking {
+        val server = TransferControlChannel()
+        val client = TransferControlChannel()
+        val token = "SESSION_OFFER_TEST"
+
+        val boundLatch = CountDownLatch(1)
+        val serverHandshakeLatch = CountDownLatch(1)
+        val clientHandshakeLatch = CountDownLatch(1)
+
+        try {
+            server.startServer(
+                expectedSessionToken = token,
+                myDeviceName = "ReceiverPhone",
+                freeStorageBytes = 500_000_000L,
+                port = 0,
+                onBound = { boundLatch.countDown() },
+                onHandshakeComplete = { serverHandshakeLatch.countDown() }
+            )
+            assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
+
+            client.connectToHost(
+                hostIp = "127.0.0.1",
+                myDeviceName = "SenderPhone",
+                sessionToken = token,
+                freeStorageBytes = 500_000_000L,
+                port = server.serverPort,
+                onHandshakeSuccess = { clientHandshakeLatch.countDown() },
+                onError = {}
+            )
+            assertTrue(serverHandshakeLatch.await(5, TimeUnit.SECONDS))
+            assertTrue(clientHandshakeLatch.await(5, TimeUnit.SECONDS))
+
+            // Sender sends TransferOffer
+            val offerDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(5_000) { server.incomingMessages.first() }
+            }
+
+            val offer = com.swiftshare.nft.channel.models.TransferOffer(
+                batchId = "batch_001",
+                senderName = "SenderPhone",
+                fileCount = 2,
+                totalBytes = 10_000_000L,
+                files = listOf(
+                    FileManifestItem(fileId = "f1", name = "photo.jpg", size = 4_000_000L, mimeType = "image/jpeg"),
+                    FileManifestItem(fileId = "f2", name = "video.mp4", size = 6_000_000L, mimeType = "video/mp4")
+                )
+            )
+            client.sendTransferOffer(offer)
+
+            val receivedOffer = offerDeferred.await()
+            assertEquals(MessageType.TRANSFER_OFFER, receivedOffer.type)
+            assertEquals("batch_001", receivedOffer.transferOffer?.batchId)
+            assertEquals("SenderPhone", receivedOffer.transferOffer?.senderName)
+            assertEquals(2, receivedOffer.transferOffer?.fileCount)
+            assertEquals(10_000_000L, receivedOffer.transferOffer?.totalBytes)
+
+            // Receiver responds with accepted
+            val responseDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(5_000) { client.incomingMessages.first() }
+            }
+
+            val response = com.swiftshare.nft.channel.models.TransferResponse(
+                batchId = "batch_001",
+                accepted = true,
+                reason = com.swiftshare.nft.channel.models.TransferRejectionReasons.OK
+            )
+            server.sendTransferResponse(response)
+
+            val receivedResponse = responseDeferred.await()
+            assertEquals(MessageType.TRANSFER_RESPONSE, receivedResponse.type)
+            assertTrue(receivedResponse.transferResponse?.accepted == true)
+            assertEquals("OK", receivedResponse.transferResponse?.reason)
+        } finally {
+            server.close()
+            client.close()
+        }
+    }
+
+    @Test(timeout = 60000)
+    fun testTransferOfferAndRejectNotEnoughSpace() = runBlocking {
+        val server = TransferControlChannel()
+        val client = TransferControlChannel()
+        val token = "SESSION_SPACE_TEST"
+
+        val boundLatch = CountDownLatch(1)
+        val serverHandshakeLatch = CountDownLatch(1)
+        val clientHandshakeLatch = CountDownLatch(1)
+
+        try {
+            server.startServer(
+                expectedSessionToken = token,
+                myDeviceName = "LowSpaceReceiver",
+                freeStorageBytes = 1_000_000L, // only 1 MB
+                port = 0,
+                onBound = { boundLatch.countDown() },
+                onHandshakeComplete = { serverHandshakeLatch.countDown() }
+            )
+            assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
+
+            client.connectToHost(
+                hostIp = "127.0.0.1",
+                myDeviceName = "SenderPhone",
+                sessionToken = token,
+                freeStorageBytes = 500_000_000L,
+                port = server.serverPort,
+                onHandshakeSuccess = { clientHandshakeLatch.countDown() },
+                onError = {}
+            )
+            assertTrue(serverHandshakeLatch.await(5, TimeUnit.SECONDS))
+            assertTrue(clientHandshakeLatch.await(5, TimeUnit.SECONDS))
+
+            val responseDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(5_000) { client.incomingMessages.first() }
+            }
+
+            // Receiver sends rejection with NOT_ENOUGH_SPACE
+            server.sendTransferResponse(
+                com.swiftshare.nft.channel.models.TransferResponse(
+                    batchId = "batch_huge",
+                    accepted = false,
+                    reason = com.swiftshare.nft.channel.models.TransferRejectionReasons.NOT_ENOUGH_SPACE
+                )
+            )
+
+            val receivedResponse = responseDeferred.await()
+            assertEquals(MessageType.TRANSFER_RESPONSE, receivedResponse.type)
+            assertEquals(false, receivedResponse.transferResponse?.accepted)
+            assertEquals(com.swiftshare.nft.channel.models.TransferRejectionReasons.NOT_ENOUGH_SPACE, receivedResponse.transferResponse?.reason)
+        } finally {
+            server.close()
+            client.close()
+        }
+    }
+
+    @Test(timeout = 60000)
+    fun testCancelTransferItemAndBatch() = runBlocking {
+        val server = TransferControlChannel()
+        val client = TransferControlChannel()
+        val token = "SESSION_CANCEL_TEST"
+
+        val boundLatch = CountDownLatch(1)
+        val serverHandshakeLatch = CountDownLatch(1)
+        val clientHandshakeLatch = CountDownLatch(1)
+
+        try {
+            server.startServer(
+                expectedSessionToken = token,
+                myDeviceName = "Server",
+                freeStorageBytes = 100_000_000L,
+                port = 0,
+                onBound = { boundLatch.countDown() },
+                onHandshakeComplete = { serverHandshakeLatch.countDown() }
+            )
+            assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
+
+            client.connectToHost(
+                hostIp = "127.0.0.1",
+                myDeviceName = "Client",
+                sessionToken = token,
+                freeStorageBytes = 100_000_000L,
+                port = server.serverPort,
+                onHandshakeSuccess = { clientHandshakeLatch.countDown() },
+                onError = {}
+            )
+            assertTrue(serverHandshakeLatch.await(5, TimeUnit.SECONDS))
+            assertTrue(clientHandshakeLatch.await(5, TimeUnit.SECONDS))
+
+            val cancelDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(5_000) { server.incomingMessages.first() }
+            }
+
+            client.sendCancelTransfer(
+                com.swiftshare.nft.channel.models.CancelTransfer(
+                    batchId = "batch_1",
+                    fileId = "f1",
+                    reason = com.swiftshare.nft.channel.models.TransferRejectionReasons.CANCELLED
+                )
+            )
+
+            val receivedCancel = cancelDeferred.await()
+            assertEquals(MessageType.CANCEL_TRANSFER, receivedCancel.type)
+            assertEquals("batch_1", receivedCancel.cancelTransfer?.batchId)
+            assertEquals("f1", receivedCancel.cancelTransfer?.fileId)
+            assertEquals("CANCELLED", receivedCancel.cancelTransfer?.reason)
+        } finally {
+            server.close()
+            client.close()
+        }
+    }
+
+    @Test(timeout = 60000)
+    fun testPresenceHeartbeatTimeoutAfter3Misses() = runBlocking {
+        val server = TransferControlChannel()
+        val client = TransferControlChannel()
+        val token = "SESSION_HB_TEST"
+
+        val boundLatch = CountDownLatch(1)
+        val serverHandshakeLatch = CountDownLatch(1)
+        val clientHandshakeLatch = CountDownLatch(1)
+
+        try {
+            server.startServer(
+                expectedSessionToken = token,
+                myDeviceName = "Server",
+                freeStorageBytes = 100_000_000L,
+                port = 0,
+                onBound = { boundLatch.countDown() },
+                onHandshakeComplete = { serverHandshakeLatch.countDown() }
+            )
+            assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
+
+            client.connectToHost(
+                hostIp = "127.0.0.1",
+                myDeviceName = "Client",
+                sessionToken = token,
+                freeStorageBytes = 100_000_000L,
+                port = server.serverPort,
+                onHandshakeSuccess = { clientHandshakeLatch.countDown() },
+                onError = {}
+            )
+            assertTrue(serverHandshakeLatch.await(5, TimeUnit.SECONDS))
+            assertTrue(clientHandshakeLatch.await(5, TimeUnit.SECONDS))
+
+            val peerLostLatch = CountDownLatch(1)
+
+            // Start heartbeat monitoring on server with onPeerLost callback
+            server.startHeartbeat("Server", onPeerLost = {
+                peerLostLatch.countDown()
+            })
+
+            // Client sends 1 heartbeat
+            client.sendHeartbeat("Client", sequence = 0L)
+
+            // Client stops sending (disconnects / closes)
+            client.close()
+
+            // After 3 misses (> 9 seconds), server should trigger onPeerLost
+            val peerLost = peerLostLatch.await(13, TimeUnit.SECONDS)
+            assertTrue("Peer presence monitor must trigger onPeerLost after 3 missed heartbeats (>9s)", peerLost)
+        } finally {
+            server.close()
+            client.close()
+        }
+    }
 }

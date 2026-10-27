@@ -178,11 +178,27 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+### T2.3.1: Transfer Offer, Free Space Check, Cancel Protocol & Presence Heartbeats
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT & INTEGRATION TESTS
+- **Verification Details**: Real tests in `TransferControlChannelTest.kt`:
+  - `testTransferOfferAndAcceptResponse`: Verified wire framing and serialization for `TransferOffer` (batch ID, sender nickname, file count, total bytes, item list) and `TransferResponse` acceptance.
+  - `testTransferOfferAndRejectNotEnoughSpace`: Verified rejection signaling with `NOT_ENOUGH_SPACE` reason when storage boundary is insufficient.
+  - `testCancelTransferItemAndBatch`: Verified item-level and batch-level cancellation dispatch (`CANCELLED`).
+  - `testPresenceHeartbeatTimeoutAfter3Misses`: Verified 3-second heartbeat ping and 3-miss (9-second) presence timeout trigger calling `onPeerLost()`.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/models/UserMessages.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/TransferControlChannelTest.kt`
+
+---
+
 ### Upcoming Phase 2 Tasks
 
+- **T2.3.2**: Room database history with `sessions` + `transfer_items` + schema migration (v1 -> v2) and real statuses.
+- **T2.3.3**: Receiver UI Transfer Offer Dialog, free space check, item deduplication, and Result Screen (Retry/Open/Send more).
 - **T2.4**: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`) & SAF Fallback.
 - **T2.5**: Wi-Fi Direct UI Orchestration (`WifiP2pDiscovery.connectToDevice`).
-- **UI Hardening**: Transfer Offer/Accept dialog, free-space check (`NOT_ENOUGH_SPACE`), deduplication, cancel item/batch, presence heartbeat (3s/3 misses), Room history.
 
 ---
 

@@ -13,7 +13,10 @@ enum class MessageType {
     PPT_COMMAND,
     HEARTBEAT,
     FILE_CHECKSUM,
-    FILE_RESUME_REQUEST
+    FILE_RESUME_REQUEST,
+    TRANSFER_OFFER,
+    TRANSFER_RESPONSE,
+    CANCEL_TRANSFER
 }
 
 @Serializable
@@ -107,6 +110,45 @@ data class PptCommand(
     val y: Float = 0f
 )
 
+@Serializable
+data class TransferOffer(
+    val batchId: String,
+    val senderName: String,
+    val fileCount: Int,
+    val totalBytes: Long,
+    val files: List<FileManifestItem>
+)
+
+@Serializable
+data class TransferResponse(
+    val batchId: String,
+    val accepted: Boolean,
+    val reason: String = "OK",
+    val rejectedFileIds: List<String> = emptyList()
+)
+
+@Serializable
+data class CancelTransfer(
+    val batchId: String,
+    val fileId: String? = null,
+    val reason: String = "USER_CANCELLED"
+)
+
+@Serializable
+data class HeartbeatMessage(
+    val timestamp: Long = System.currentTimeMillis(),
+    val senderName: String,
+    val sequence: Long = 0L
+)
+
+object TransferRejectionReasons {
+    const val OK = "OK"
+    const val USER_REJECTED = "USER_REJECTED"
+    const val NOT_ENOUGH_SPACE = "NOT_ENOUGH_SPACE"
+    const val ITEM_EXISTS = "ITEM_EXISTS"
+    const val CANCELLED = "CANCELLED"
+}
+
 private val jsonSerializer = Json { ignoreUnknownKeys = true }
 
 @Serializable
@@ -118,7 +160,11 @@ data class ControlMessage(
     val statusAck: FileStatusAck? = null,
     val pptCommand: PptCommand? = null,
     val fileChecksum: FileChecksumMessage? = null,
-    val fileResumeRequest: FileResumeRequest? = null
+    val fileResumeRequest: FileResumeRequest? = null,
+    val transferOffer: TransferOffer? = null,
+    val transferResponse: TransferResponse? = null,
+    val cancelTransfer: CancelTransfer? = null,
+    val heartbeat: HeartbeatMessage? = null
 ) {
     fun toJson(): String = jsonSerializer.encodeToString(this)
 

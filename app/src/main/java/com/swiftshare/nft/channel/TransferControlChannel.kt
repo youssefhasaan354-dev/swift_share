@@ -103,6 +103,10 @@ class TransferControlChannel {
                             }
                         }
                     }
+                    MessageType.HEARTBEAT -> {
+                        notifyHeartbeatReceived()
+                        _incomingMessages.tryEmit(msg)
+                    }
                     else -> {
                         _incomingMessages.tryEmit(msg)
                     }
@@ -151,6 +155,9 @@ class TransferControlChannel {
                                     onError(ack.reason)
                                 }
                             }
+                        } else if (msg.type == MessageType.HEARTBEAT) {
+                            notifyHeartbeatReceived()
+                            _incomingMessages.tryEmit(msg)
                         } else {
                             _incomingMessages.tryEmit(msg)
                         }
@@ -195,6 +202,66 @@ class TransferControlChannel {
         sendMessage(ControlMessage(type = MessageType.FILE_RESUME_REQUEST, fileResumeRequest = req))
     }
 
+    fun sendTransferOffer(offer: com.swiftshare.nft.channel.models.TransferOffer) {
+        sendMessage(ControlMessage(type = MessageType.TRANSFER_OFFER, transferOffer = offer))
+    }
+
+    fun sendTransferResponse(response: com.swiftshare.nft.channel.models.TransferResponse) {
+        sendMessage(ControlMessage(type = MessageType.TRANSFER_RESPONSE, transferResponse = response))
+    }
+
+    fun sendCancelTransfer(cancel: com.swiftshare.nft.channel.models.CancelTransfer) {
+        sendMessage(ControlMessage(type = MessageType.CANCEL_TRANSFER, cancelTransfer = cancel))
+    }
+
+    fun sendHeartbeat(senderName: String, sequence: Long = 0L) {
+        val hb = com.swiftshare.nft.channel.models.HeartbeatMessage(
+            timestamp = System.currentTimeMillis(),
+            senderName = senderName,
+            sequence = sequence
+        )
+        sendMessage(ControlMessage(type = MessageType.HEARTBEAT, heartbeat = hb))
+    }
+
+    private var heartbeatJob: Job? = null
+    private var presenceMonitorJob: Job? = null
+    private val lastHeartbeatReceived = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+
+    fun startHeartbeat(senderName: String, onPeerLost: (() -> Unit)? = null) {
+        stopHeartbeat()
+        lastHeartbeatReceived.set(System.currentTimeMillis())
+
+        heartbeatJob = scope.launch {
+            var seq = 0L
+            while (isActive) {
+                kotlinx.coroutines.delay(3000)
+                sendHeartbeat(senderName, seq++)
+            }
+        }
+
+        presenceMonitorJob = scope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(1000)
+                if (System.currentTimeMillis() - lastHeartbeatReceived.get() > 9000L) {
+                    com.swiftshare.common.AppLogger.e("ControlChannel", "Peer presence heartbeat timeout (3 misses / 9s); peer lost")
+                    onPeerLost?.invoke()
+                    break
+                }
+            }
+        }
+    }
+
+    fun notifyHeartbeatReceived() {
+        lastHeartbeatReceived.set(System.currentTimeMillis())
+    }
+
+    fun stopHeartbeat() {
+        heartbeatJob?.cancel()
+        presenceMonitorJob?.cancel()
+        heartbeatJob = null
+        presenceMonitorJob = null
+    }
+
     fun sendMessage(msg: ControlMessage) {
         scope.launch {
             try {
@@ -206,6 +273,7 @@ class TransferControlChannel {
     }
 
     fun close() {
+        stopHeartbeat()
         serverJob?.cancel()
         try {
             activeServerSocket?.close()
