@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.swiftshare.SwiftShareApp
-import com.swiftshare.cleaner.JunkCleanerEngine
+import com.swiftshare.cleaner.CleanerEngine
 import com.swiftshare.common.Constants
 import com.swiftshare.common.NetworkUtils
 import com.swiftshare.converter.VideoToAudioConverter
@@ -62,7 +62,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
     val pcRemoteServer = PcRemoteServer(context, mediaRepo)
     val groupShareEngine = GroupShareEngine(dataChannel)
     val safeBoxVault = SafeBoxVault(context, db.safeBoxDao())
-    val junkCleaner = JunkCleanerEngine(context)
+    val cleanerEngine = CleanerEngine(context)
     val statusSaver = StatusSaverManager(context)
     val videoConverter = VideoToAudioConverter(context)
 
