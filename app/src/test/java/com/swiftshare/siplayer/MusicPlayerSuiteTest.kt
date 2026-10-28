@@ -166,8 +166,8 @@ class MusicPlayerSuiteTest {
     }
 
     @Test(timeout = 60000)
-    fun testSleepTimerEndOfSong() = runTest {
-        val timer = SleepTimer(this)
+    fun testSleepTimerEndOfSong() {
+        val timer = SleepTimer()
         var finished = false
         timer.startEndOfSong { finished = true }
 

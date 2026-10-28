@@ -143,24 +143,28 @@ class TransferControlChannel {
                 sendMessage(ControlMessage(type = MessageType.HANDSHAKE_REQ, handshakeReq = req))
 
                 launch {
-                    while (socket.isConnected && !socket.isClosed) {
-                        val line = reader.readLine() ?: break
-                        val msg = ControlMessage.fromJson(line) ?: continue
+                    try {
+                        while (socket.isConnected && !socket.isClosed) {
+                            val line = reader.readLine() ?: break
+                            val msg = ControlMessage.fromJson(line) ?: continue
 
-                        if (msg.type == MessageType.HANDSHAKE_ACK) {
-                            msg.handshakeAck?.let { ack ->
-                                if (ack.accepted) {
-                                    onHandshakeSuccess(ack)
-                                } else {
-                                    onError(ack.reason)
+                            if (msg.type == MessageType.HANDSHAKE_ACK) {
+                                msg.handshakeAck?.let { ack ->
+                                    if (ack.accepted) {
+                                        onHandshakeSuccess(ack)
+                                    } else {
+                                        onError(ack.reason)
+                                    }
                                 }
+                            } else if (msg.type == MessageType.HEARTBEAT) {
+                                notifyHeartbeatReceived()
+                                _incomingMessages.tryEmit(msg)
+                            } else {
+                                _incomingMessages.tryEmit(msg)
                             }
-                        } else if (msg.type == MessageType.HEARTBEAT) {
-                            notifyHeartbeatReceived()
-                            _incomingMessages.tryEmit(msg)
-                        } else {
-                            _incomingMessages.tryEmit(msg)
                         }
+                    } catch (e: Exception) {
+                        // Socket closed or disconnect - expected on termination
                     }
                 }
             } catch (e: Exception) {

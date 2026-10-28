@@ -75,6 +75,7 @@ import com.swiftshare.data.entities.TransferItemEntity
 import com.swiftshare.explorer.MediaItem
 import com.swiftshare.ui.SwiftShareViewModel
 import com.swiftshare.ui.components.ApkSecurityDialog
+import com.swiftshare.ui.components.ZipViewerDialog
 import com.swiftshare.ui.theme.AccentCyan
 import com.swiftshare.ui.theme.BackgroundDark
 import com.swiftshare.ui.theme.DangerRed
@@ -596,6 +597,7 @@ private fun ReceivedFilesBrowserView(
     onInspectApk: (ApkSecurityReport) -> Unit
 ) {
     var refreshKey by remember { mutableIntStateOf(0) }
+    var inspectingZipFile by remember { mutableStateOf<File?>(null) }
     val downloadDir = remember(refreshKey) {
         StorageDestinationManager.getDestinationDirectory(context)
     }
@@ -668,10 +670,19 @@ private fun ReceivedFilesBrowserView(
                         context = context,
                         isAr = isAr,
                         onInspectApk = onInspectApk,
+                        onInspectZip = { inspectingZipFile = it },
                         onDeleted = { refreshKey++ }
                     )
                 }
             }
+        }
+
+        inspectingZipFile?.let { zf ->
+            ZipViewerDialog(
+                zipFile = zf,
+                onDismiss = { inspectingZipFile = null },
+                onExtractionComplete = { refreshKey++ }
+            )
         }
     }
 }
@@ -682,6 +693,7 @@ private fun DiskFileRow(
     context: Context,
     isAr: Boolean,
     onInspectApk: (ApkSecurityReport) -> Unit,
+    onInspectZip: (File) -> Unit,
     onDeleted: () -> Unit
 ) {
     val dateStr = remember(file.lastModified()) {
@@ -700,7 +712,9 @@ private fun DiskFileRow(
     ) {
         // Icon
         val isApk = file.name.endsWith(".apk", ignoreCase = true)
+        val isZip = file.name.endsWith(".zip", ignoreCase = true)
         val icon = when {
+            isZip -> "🗜️"
             isApk -> "📦"
             file.name.matches(Regex(".*\\.(jpg|jpeg|png|webp|gif)$", RegexOption.IGNORE_CASE)) -> "🖼️"
             file.name.matches(Regex(".*\\.(mp4|mkv|mov|avi)$", RegexOption.IGNORE_CASE)) -> "🎬"
@@ -738,7 +752,16 @@ private fun DiskFileRow(
 
         // Actions
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (isApk) {
+            if (isZip) {
+                Button(
+                    onClick = { onInspectZip(file) },
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Text(if (isAr) "استعراض ZIP" else "Inspect ZIP", fontSize = 10.sp)
+                }
+            } else if (isApk) {
                 Button(
                     onClick = {
                         val report = ApkInstaller.inspectApk(context, file)

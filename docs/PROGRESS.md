@@ -282,7 +282,7 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/res/values/strings.xml`
   - `app/src/main/res/values-ar/strings.xml`
   - `app/src/test/java/com/swiftshare/nft/discovery/WifiP2pOrchestrationTest.kt`
-- **Commit**: Current commit
+- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
 
 ---
 
@@ -303,7 +303,7 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/groupshare/GroupShareEngine.kt`
   - `app/src/main/java/com/swiftshare/ui/screens/GroupShareScreen.kt`
   - `app/src/test/java/com/swiftshare/groupshare/GroupShareEngineTest.kt`
-- **Commit**: Current commit
+- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
 
 ---
 
@@ -358,7 +358,7 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
   - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
   - `app/src/test/java/com/swiftshare/webshare/WebAuthTest.kt`
-- **Commit**: Current commit
+- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
 
 ---
 
@@ -523,8 +523,30 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/res/values-ar/strings.xml`
   - `app/src/test/java/com/swiftshare/siplayer/MusicPlayerSuiteTest.kt`
   - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
-- **Commit**: `9972d57` (`feat(T4.1): implement music player with playlists, equalizer, sleep timer, lrc lyrics, folder scan, and media session service`)
-- **Next**: T4.2 (D2: ZIP Explorer with zip-slip safety, unit-tested with malicious archive)
+- **Commit**: `5900ab1` (`feat(T4.1): implement music player with playlists, equalizer, sleep timer, lrc lyrics, folder scan, and media session service`)
+
+---
+
+### T4.2 (D2): ZIP Explorer (Browse, Preview, Extract with Zip-Slip Path Traversal Protection)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`ZipExplorerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Zip Engine (`ZipExplorer.kt`)**:
+    - Browse: Enumerates archive contents, file counts, uncompressed byte metrics, compressed sizes, and directory hierarchies without extracting.
+    - Preview: Instant in-memory decompression of text files (JSON, XML, code, logs up to 128 KB) and images (PNG, JPG, WebP up to 2 MB).
+    - Zip-Slip Protection: Rigorously verifies canonical extraction paths (`destFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)`). Automatically detects and blocks malicious path traversal sequences (`../../`, `dir/../../../`, `..\..\windows_traversal.bat`), preventing arbitrary file writes outside the target directory.
+  - **UI Integration (`ZipViewerDialog.kt`)**: Material 3 dialog with archive stats, entry search filter, file type icons, text/image preview dialogs, and one-tap "Extract All" button with summary reporting blocked malicious paths.
+  - **History Browser Integration (`TransferHistoryScreen.kt`)**: Added one-tap "Inspect ZIP" action for downloaded `.zip` files in the Received Files tab.
+  - **Unit Tests**: 4 unit tests in `ZipExplorerTest.kt` passing under 60s hard timeouts, including a dedicated attack scenario testing a crafted malicious ZIP archive containing 3 path traversal attacks, asserting all 3 are blocked while legitimate files are extracted cleanly. Total unit tests in project now at **85 executed, 0 failures, 0 errors**.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/explorer/zip/ZipExplorer.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/components/ZipViewerDialog.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/test/java/com/swiftshare/explorer/ZipExplorerTest.kt` (new)
+  - `app/src/test/java/com/swiftshare/siplayer/MusicPlayerSuiteTest.kt`
+- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+- **Next**: T4.3 (D3: Global Search across files, apps, and history)
 
 ---
 
