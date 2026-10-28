@@ -152,11 +152,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
             avatarId = 1,
             onReady = { payload ->
                 activeReceiverPayload.value = payload
-                val freeStorage = try {
-                    Environment.getExternalStorageDirectory()?.freeSpace ?: (10L * 1024L * 1024L * 1024L)
-                } catch (_: Throwable) {
-                    10L * 1024L * 1024L * 1024L
-                }
+                val freeStorage = com.swiftshare.common.StorageDestinationManager.getFreeSpace(context)
 
                 controlChannel.startServer(
                     expectedSessionToken = payload.sessionToken,
@@ -185,11 +181,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                         when (msg.type) {
                             com.swiftshare.nft.channel.models.MessageType.TRANSFER_OFFER -> {
                                 msg.transferOffer?.let { offer ->
-                                    val freeBytes = try {
-                                        Environment.getExternalStorageDirectory()?.freeSpace ?: (10L * 1024L * 1024L * 1024L)
-                                    } catch (_: Throwable) {
-                                        10L * 1024L * 1024L * 1024L
-                                    }
+                                    val freeBytes = com.swiftshare.common.StorageDestinationManager.getFreeSpace(context)
                                     val needed = offer.totalBytes + 50L * 1024L * 1024L // 50 MB safety headroom
                                     if (freeBytes < needed) {
                                         com.swiftshare.common.AppLogger.e("SwiftShareVM", "Rejecting offer: NOT_ENOUGH_SPACE (free: $freeBytes, needed: $needed)", notifyUser = true)
@@ -202,7 +194,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                         )
                                     } else {
                                         currentIncomingBatchId = offer.batchId
-                                        val destinationDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare")
+                                        val destinationDir = com.swiftshare.common.StorageDestinationManager.getDestinationDirectory(context)
                                         val existingNames = if (destinationDir.exists()) destinationDir.list()?.toSet() ?: emptySet() else emptySet()
 
                                         val session = com.swiftshare.data.entities.SessionEntity(
@@ -256,13 +248,31 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                     dataChannel.notifyChecksumReceived(cs.fileId, cs.sha256)
                                 }
                             }
+                            com.swiftshare.nft.channel.models.MessageType.AVATAR_UPDATE -> {
+                                msg.avatarUpdate?.let { upd ->
+                                    activePeer.value = activePeer.value?.copy(
+                                        deviceName = upd.deviceName,
+                                        avatarEmoji = upd.avatarEmoji,
+                                        customAvatarBase64 = upd.customAvatarBase64
+                                    )
+                                }
+                            }
                             else -> {}
                         }
                     }
                 }
 
+                // Send own avatar to connecting peer
+                controlChannel.sendAvatarUpdate(
+                    deviceName = devName,
+                    avatarEmoji = com.swiftshare.common.LocaleManager.avatarEmoji.value,
+                    customAvatarBase64 = com.swiftshare.common.LocaleManager.customAvatarBase64.value
+                )
+
+                val rxDestDir = com.swiftshare.common.StorageDestinationManager.getDestinationDirectory(context)
                 dataChannel.startReceiverServer(
                     expectedSessionToken = payload.sessionToken,
+                    downloadDir = rxDestDir,
                     onFileReceived = { file, item ->
                         val bId = currentIncomingBatchId ?: "batch_incoming"
                         recordTransfer(bId, item.fileId, item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true, status = "COMPLETED")
@@ -290,11 +300,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
 
         TransferForegroundService.startService(context, files.firstOrNull()?.name ?: "Transfer", totalBytes)
 
-        val freeStorage = try {
-            Environment.getExternalStorageDirectory()?.freeSpace ?: (10L * 1024L * 1024L * 1024L)
-        } catch (_: Throwable) {
-            10L * 1024L * 1024L * 1024L
-        }
+        val freeStorage = com.swiftshare.common.StorageDestinationManager.getFreeSpace(context)
 
         controlChannel.connectToHost(
             hostIp = peer.ip,
@@ -305,6 +311,26 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                 controlChannel.startHeartbeat(devName, onPeerLost = {
                     com.swiftshare.common.AppLogger.e("SwiftShareVM", "Peer lost during transmission (missed 3 heartbeats)", notifyUser = true)
                 })
+
+                controlChannel.sendAvatarUpdate(
+                    deviceName = devName,
+                    avatarEmoji = com.swiftshare.common.LocaleManager.avatarEmoji.value,
+                    customAvatarBase64 = com.swiftshare.common.LocaleManager.customAvatarBase64.value
+                )
+
+                viewModelScope.launch(Dispatchers.IO) {
+                    controlChannel.incomingMessages.collect { msg ->
+                        if (msg.type == com.swiftshare.nft.channel.models.MessageType.AVATAR_UPDATE) {
+                            msg.avatarUpdate?.let { upd ->
+                                activePeer.value = activePeer.value?.copy(
+                                    deviceName = upd.deviceName,
+                                    avatarEmoji = upd.avatarEmoji,
+                                    customAvatarBase64 = upd.customAvatarBase64
+                                )
+                            }
+                        }
+                    }
+                }
 
                 val manifestItems = files.map { item ->
                     FileManifestItem(

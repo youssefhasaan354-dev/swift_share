@@ -1,5 +1,7 @@
 package com.swiftshare.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -451,9 +454,23 @@ fun HomeScreen(
 
     // ── Device Name & Avatar Customization Dialog ───────────────────────────
     if (showProfileDialog) {
+        val context = LocalContext.current
         val emojis = listOf("⚡", "🚀", "🦊", "🦁", "🐼", "🤖", "💎", "🔥", "👑", "🦅")
         var chosenAvatar by remember { mutableStateOf(avatarEmoji) }
         var inputName by remember { mutableStateOf(deviceName) }
+        var customPhotoBase64 by remember { mutableStateOf(LocaleManager.customAvatarBase64.value) }
+
+        val photoPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri ->
+            if (uri != null) {
+                val b64 = com.swiftshare.common.AvatarUtils.compressUriToBase64(context, uri)
+                if (b64 != null) {
+                    customPhotoBase64 = b64
+                    chosenAvatar = "🖼️"
+                }
+            }
+        }
 
         Dialog(onDismissRequest = { showProfileDialog = false }) {
             Column(
@@ -511,6 +528,29 @@ fun HomeScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Custom Photo Option (<= 32 KB)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (customPhotoBase64 != null) "Custom Photo Set (<= 32 KB)" else "Custom Photo (<= 32 KB)",
+                        fontSize = 12.sp,
+                        color = if (customPhotoBase64 != null) AccentCyan else TextSecondary
+                    )
+                    Button(
+                        onClick = { photoPickerLauncher.launch("image/*") },
+                        colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("📷 Choose", fontSize = 11.sp, color = AccentCyan)
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -544,7 +584,7 @@ fun HomeScreen(
                     Button(
                         onClick = {
                             if (inputName.isNotBlank()) {
-                                LocaleManager.setDeviceProfile(inputName.trim(), chosenAvatar)
+                                LocaleManager.setDeviceProfile(inputName.trim(), chosenAvatar, customPhotoBase64)
                             }
                             showProfileDialog = false
                         },

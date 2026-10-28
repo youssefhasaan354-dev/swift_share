@@ -357,13 +357,132 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
-### Upcoming Phase 3 Tasks
-- **C2**: Avatar & nickname settings (built-in avatars or custom photo <= 32 KB) via avatar control message.
-- **C3**: Destination volume selection (internal vs SD card) in settings, used by receive path & free-space check.
-- **C4**: First-run permission guide: one screen per permission with rationale, settings recovery, Arabic + English RTL.
-- **C5**: Incoming APK certificate SHA-256 and dangerous permissions security check before install.
-- **C6**: System share sheet intake (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`).
-- **C7**: History UX: grouped by session, filter sent/received, received files browser, delete, re-send.
+### T3.2 (C2): Avatar & Nickname Settings (Built-in Emojis, Custom Photos <= 32 KB & Wire Synchronization)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`AvatarTest.kt`) & COMPILE VERIFICATION
+- **Verification Details**:
+  - `AvatarUtils.kt`: Base64 encoding/decoding, bitmap compression down to <= 32 KB limit, size validation (`isUnderMaxLimit`).
+  - Wire Synchronization: Added `AvatarUpdateMessage` to `UserMessages.kt` and `MessageType.AVATAR_UPDATE` in `TransferControlChannel.kt`. Control channel sends local avatar on connection and updates `activePeer` reactively.
+  - Discovery Payloads: `ConnectionPayload` and `PeerDevice` carry `avatarEmoji`, `customAvatarBase64`, and `deviceType`.
+  - UI Rendering: `RadarScanView` and `HomeScreen` render custom avatar photo or emoji for local user and orbiting discovered peers. Full RTL Arabic and English support.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/AvatarUtils.kt` (new)
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/models/UserMessages.kt`
+  - `app/src/main/java/com/swiftshare/nft/discovery/DeviceDiscoveryManager.kt`
+  - `app/src/main/java/com/swiftshare/nft/discovery/NsdDiscoveryManager.kt`
+  - `app/src/main/java/com/swiftshare/nft/discovery/models/ConnectionPayload.kt`
+  - `app/src/main/java/com/swiftshare/nft/discovery/models/PeerDevice.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/components/RadarScanView.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/test/java/com/swiftshare/common/AvatarTest.kt` (new)
+
+---
+
+### T3.3 (C3): Destination Volume Selection (Internal vs SD Card)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`StorageDestinationTest.kt`)
+- **Verification Details**:
+  - `StorageDestinationManager.kt`: Enumerates primary internal storage and secondary external SD cards. Computes per-volume free and total bytes, persists user volume choice in SharedPreferences, and provides safe fallback to internal storage when SD card is detached.
+  - ViewModel Integration: Wired into `SwiftShareViewModel.kt` for `getFreeSpace` and `dataChannel.startReceiverServer(downloadDir = ...)`.
+  - UI Settings: Integrated into `TransferHistoryScreen` "Me Profile & Settings" tab with real-time volume switching, storage breakdown, and free-space metrics.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/StorageDestinationManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
+  - `app/src/test/java/com/swiftshare/common/StorageDestinationTest.kt` (new)
+
+---
+
+### T3.4 (C4): First-Run Permission Guide (One Screen Per Permission, Rationale, Settings Recovery & RTL)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`PermissionGuideTest.kt`) & COMPILE VERIFICATION
+- **Verification Details**:
+  - `PermissionGuideScreen.kt`: 4-step interactive permission onboarding wizard:
+    1. Nearby Devices / Wi-Fi (P2P Wi-Fi Direct & local offline peer discovery)
+    2. Storage & Media (Read files to send and save received items)
+    3. Camera (Zero-configuration instant QR connection)
+    4. Bluetooth (Offline APK sharing to friends)
+  - Features: Categorized permission requests, settings recovery button launching `Settings.ACTION_APPLICATION_DETAILS_SETTINGS`, skip-all option, persistent completion flag in SharedPreferences, and Arabic/English RTL localization.
+  - Wired in `MainActivity.kt` as start destination on first run and accessible on-demand from Settings.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/PermissionManager.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/PermissionGuideScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/test/java/com/swiftshare/common/PermissionGuideTest.kt` (new)
+
+---
+
+### T3.5 (C5): Incoming APK Certificate SHA-256 and Dangerous Permissions Security Check
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`ApkSecurityTest.kt`)
+- **Verification Details**:
+  - `ApkInstaller.inspectApk`: Safely parses package archive metadata, app label, and version information.
+  - Certificate Fingerprint: Computes SHA-256 checksum formatted as colon-separated uppercase hex pairs (`computeCertSha256`).
+  - Dangerous Permissions Audit: Classifies permissions into high-risk (SMS, telephony, accessibility, device admin, silent install) and medium-risk (location, camera, microphone, contacts, storage).
+  - UI Dialog: Created `ApkSecurityDialog.kt` presenting security audit report, risk badges, certificate fingerprint with one-tap copy, and user confirmation prompt prior to package installation.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/ApkInstaller.kt`
+  - `app/src/main/java/com/swiftshare/ui/components/ApkSecurityDialog.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
+  - `app/src/test/java/com/swiftshare/common/ApkSecurityTest.kt` (new)
+
+---
+
+### T3.6 (C6): System Share Sheet Intake (`ACTION_SEND` / `ACTION_SEND_MULTIPLE`)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL LINT & MANIFEST VERIFICATION
+- **Verification Details**:
+  - Registered `<intent-filter>` under `MainActivity` in `AndroidManifest.xml` for both `ACTION_SEND` and `ACTION_SEND_MULTIPLE` with `mimeType="*/*"`.
+  - Stream Extraction: `handleIncomingShareIntent` extracts single and multiple stream URIs, resolves filename/size via ContentResolver, caches streams for NIO channel zero-copy transfer, updates `viewModel.setSelectedFiles(items)`, and auto-routes to `radar_send`.
+- **Files Touched**:
+  - `app/src/main/AndroidManifest.xml`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+
+---
+
+### T3.7 (C7): History UX (Grouped by Session, Sent/Received Filter, Files Browser, Delete & Re-Send)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS & LINT VERIFICATION
+- **Verification Details**:
+  - `SessionDao.kt`: Added `deleteSessionAndItems(sessionId)`, `getAllTransferItems()`, and `clearAll()`.
+  - `TransferHistoryScreen.kt`:
+    1. Sessions Tab: Grouped by session (`SessionEntity` + `TransferItemEntity`), filter pills (All, Received, Sent), status badges (`COMPLETED`, `IN_PROGRESS`, `CANCELLED`), expandable file items, one-tap Re-send button (populates `viewModel.selectedSendFiles` and launches `radar_send`), and Delete session action.
+    2. Received Files Browser: Live disk file manager scanning `StorageDestinationManager.getDestinationDirectory`, displaying actual files with Open, System Share Sheet chooser, Delete, and APK Security Audit & Install.
+    3. Me & Settings Tab: Device profile customization (emojis + photo picker <= 32 KB), destination storage volume selector, permission guide review, and language switcher.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
+
+---
+
+### Phase 3 Gate Verification
+- **Status**: DONE
+- **Verification Command**: `./gradlew.bat lintDebug testDebugUnitTest assembleDebug`
+- **Verification Mode**: VERIFIED BY FRESH BUILD & TEST EXECUTION (55 actionable tasks executed)
+- **Gate Metrics**:
+  - **Unit Tests**: **62 executed, 0 failures, 0 errors** across 15 test suites:
+    - `ApkSecurityTest`: 2 tests passed
+    - `AppLoggerTest`: 2 tests passed
+    - `AvatarTest`: 5 tests passed
+    - `DistinctPortTest`: 2 tests passed
+    - `PermissionGuideTest`: 2 tests passed
+    - `SafeFileNameTest`: 9 tests passed
+    - `ScopedStorageTest`: 3 tests passed
+    - `StorageDestinationTest`: 3 tests passed
+    - `RoomMigrationTest`: 2 tests passed
+    - `GroupShareEngineTest`: 1 test passed
+    - `DataChannelTokenTest`: 8 tests passed
+    - `MultiStreamDataChannelTest`: 9 tests passed
+    - `TransferControlChannelTest`: 7 tests passed
+    - `WifiP2pOrchestrationTest`: 2 tests passed
+    - `WebAuthTest`: 5 tests passed
+  - **Android Lint**:
+    - **Lint Errors: 0** (Maintained 0 errors).
+  - **APK Assembly**: `assembleDebug` passed cleanly.
 
 ---
 

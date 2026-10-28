@@ -9,6 +9,7 @@ import com.swiftshare.nft.discovery.models.PeerDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,6 +48,21 @@ class DeviceDiscoveryManager(private val context: Context) {
                 _allDiscoveredPeers.value = mergedList
             }
         }
+
+        // Periodic stale peer pruning (remove peers after 3 missed heartbeats/beacons = 9s)
+        scope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(3000)
+                val now = System.currentTimeMillis()
+                val current = _allDiscoveredPeers.value
+                val active = current.filter {
+                    it.connectionType == com.swiftshare.nft.discovery.models.PeerConnectionType.WIFI_DIRECT || (now - it.lastSeenTimestamp) < 9000L
+                }
+                if (active.size != current.size) {
+                    _allDiscoveredPeers.value = active
+                }
+            }
+        }
     }
 
     fun startReceiverMode(
@@ -62,9 +78,12 @@ class DeviceDiscoveryManager(private val context: Context) {
         val validLanIp = if (rawLocalIp.isNotBlank() && rawLocalIp != "0.0.0.0" && !rawLocalIp.startsWith("192.168.49")) rawLocalIp else null
         val isOnLan = validLanIp != null
 
+        val currentEmoji = com.swiftshare.common.LocaleManager.avatarEmoji.value
+        val currentPhoto = com.swiftshare.common.LocaleManager.customAvatarBase64.value
+
         // ── Step 1: Always advertise on Same-LAN (NSD + UDP 55283) concurrently
         scope.launch { nsdManager.registerService(Constants.PORT_CONTROL, deviceName) }
-        scope.launch { nsdManager.startUdpBroadcasting(deviceName, Constants.PORT_CONTROL, sessionToken) }
+        scope.launch { nsdManager.startUdpBroadcasting(deviceName, Constants.PORT_CONTROL, sessionToken, "Android", currentEmoji) }
         scope.launch { bleManager.startAdvertising(deviceName, sessionToken) }
 
         // ── Step 2: Attempt Wi-Fi Direct Group / LocalOnlyHotspot concurrently
@@ -80,6 +99,9 @@ class DeviceDiscoveryManager(private val context: Context) {
                     sessionToken = sessionToken,
                     deviceName = deviceName,
                     avatarId = avatarId,
+                    avatarEmoji = currentEmoji,
+                    customAvatarBase64 = currentPhoto,
+                    deviceType = "Android",
                     lanIp = validLanIp
                 )
                 _activePayload.value = payload
@@ -97,6 +119,9 @@ class DeviceDiscoveryManager(private val context: Context) {
                             sessionToken = sessionToken,
                             deviceName = deviceName,
                             avatarId = avatarId,
+                            avatarEmoji = currentEmoji,
+                            customAvatarBase64 = currentPhoto,
+                            deviceType = "Android",
                             lanIp = validLanIp
                         )
                         _activePayload.value = payload
@@ -113,6 +138,9 @@ class DeviceDiscoveryManager(private val context: Context) {
                             sessionToken = sessionToken,
                             deviceName = deviceName,
                             avatarId = avatarId,
+                            avatarEmoji = currentEmoji,
+                            customAvatarBase64 = currentPhoto,
+                            deviceType = "Android",
                             lanIp = validLanIp
                         )
                         _activePayload.value = payload

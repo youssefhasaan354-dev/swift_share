@@ -16,8 +16,12 @@ data class PeerDevice(
     val ip: String,
     val port: Int = 2999,
     val avatarId: Int = 1,
+    val avatarEmoji: String? = null,
+    val customAvatarBase64: String? = null,
+    val deviceType: String = "Android",
     val rssi: Int = -50,
     val connectionType: PeerConnectionType = PeerConnectionType.WIFI_DIRECT,
     val sessionToken: String? = null,
     val lastSeenTimestamp: Long = System.currentTimeMillis()
 )
+

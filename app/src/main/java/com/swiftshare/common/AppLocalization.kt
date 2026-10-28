@@ -226,6 +226,8 @@ object LocaleManager {
     private const val KEY_LANG = "app_language"
     private const val KEY_DEVICE_NAME = "device_name"
     private const val KEY_AVATAR = "avatar_emoji"
+    private const val KEY_CUSTOM_AVATAR = "custom_avatar_base64"
+    const val MAX_AVATAR_BYTES = 32 * 1024 // 32 KB
 
     private lateinit var prefs: SharedPreferences
 
@@ -238,12 +240,16 @@ object LocaleManager {
     private val _avatarEmoji = MutableStateFlow("⚡")
     val avatarEmoji: StateFlow<String> = _avatarEmoji.asStateFlow()
 
+    private val _customAvatarBase64 = MutableStateFlow<String?>(null)
+    val customAvatarBase64: StateFlow<String?> = _customAvatarBase64.asStateFlow()
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedLang = prefs.getString(KEY_LANG, AppLanguage.EN.code) ?: AppLanguage.EN.code
         _currentLanguage.value = if (savedLang == "ar") AppLanguage.AR else AppLanguage.EN
         _deviceName.value = prefs.getString(KEY_DEVICE_NAME, Build.MODEL) ?: Build.MODEL
         _avatarEmoji.value = prefs.getString(KEY_AVATAR, "⚡") ?: "⚡"
+        _customAvatarBase64.value = prefs.getString(KEY_CUSTOM_AVATAR, null)
     }
 
     fun setLanguage(lang: AppLanguage) {
@@ -253,13 +259,19 @@ object LocaleManager {
         }
     }
 
-    fun setDeviceProfile(name: String, avatar: String) {
+    fun setDeviceProfile(name: String, avatar: String, customBase64: String? = null) {
         _deviceName.value = name
         _avatarEmoji.value = avatar
+        val validatedBase64 = if (customBase64 != null) {
+            val byteCount = (customBase64.length * 3) / 4
+            if (byteCount <= MAX_AVATAR_BYTES) customBase64 else null
+        } else null
+        _customAvatarBase64.value = validatedBase64
         if (::prefs.isInitialized) {
             prefs.edit()
                 .putString(KEY_DEVICE_NAME, name)
                 .putString(KEY_AVATAR, avatar)
+                .putString(KEY_CUSTOM_AVATAR, validatedBase64)
                 .apply()
         }
     }

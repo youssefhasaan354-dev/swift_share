@@ -58,6 +58,7 @@ import com.swiftshare.ui.screens.FilePickerScreen
 import com.swiftshare.ui.screens.GroupShareScreen
 import com.swiftshare.ui.screens.HomeScreen
 import com.swiftshare.ui.screens.InviteScreen
+import com.swiftshare.ui.screens.PermissionGuideScreen
 import com.swiftshare.ui.screens.MediaPlayerScreen
 import com.swiftshare.ui.screens.PcConnectScreen
 import com.swiftshare.ui.screens.PhoneCloneScreen
@@ -286,11 +287,23 @@ class MainActivity : FragmentActivity() {
                 }
             }
         ) { innerPadding ->
+            val startDest = if (!PermissionManager.hasCompletedGuide(this@MainActivity)) "permission_guide" else "home"
             NavHost(
                 navController = navController,
-                startDestination = "home",
+                startDestination = startDest,
                 modifier = Modifier.padding(innerPadding)
             ) {
+                // 0. Permission Onboarding Guide
+                composable("permission_guide") {
+                    PermissionGuideScreen(
+                        onFinish = {
+                            navController.navigate("home") {
+                                popUpTo("permission_guide") { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 // 1. Home Dashboard
                 composable("home") {
                     HomeScreen(
@@ -483,6 +496,8 @@ class MainActivity : FragmentActivity() {
                 // 14. Transfer History & Me Profile
                 composable("transfer_history") {
                     TransferHistoryScreen(
+                        viewModel = vm,
+                        onNavigate = { route -> navController.navigate(route) },
                         onBack = {
                             if (navController.previousBackStackEntry != null) {
                                 navController.popBackStack()

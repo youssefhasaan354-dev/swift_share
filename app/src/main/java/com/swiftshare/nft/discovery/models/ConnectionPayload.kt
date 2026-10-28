@@ -14,6 +14,9 @@ data class ConnectionPayload(
     val sessionToken: String,
     val deviceName: String,
     val avatarId: Int = 1,
+    val avatarEmoji: String? = null,
+    val customAvatarBase64: String? = null,
+    val deviceType: String = "Android",
     val lanIp: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val ttlMillis: Long = 600_000L // 10 minutes TTL

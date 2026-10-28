@@ -16,7 +16,8 @@ enum class MessageType {
     FILE_RESUME_REQUEST,
     TRANSFER_OFFER,
     TRANSFER_RESPONSE,
-    CANCEL_TRANSFER
+    CANCEL_TRANSFER,
+    AVATAR_UPDATE
 }
 
 @Serializable
@@ -141,6 +142,13 @@ data class HeartbeatMessage(
     val sequence: Long = 0L
 )
 
+@Serializable
+data class AvatarUpdateMessage(
+    val deviceName: String,
+    val avatarEmoji: String? = null,
+    val customAvatarBase64: String? = null
+)
+
 object TransferRejectionReasons {
     const val OK = "OK"
     const val USER_REJECTED = "USER_REJECTED"
@@ -164,7 +172,8 @@ data class ControlMessage(
     val transferOffer: TransferOffer? = null,
     val transferResponse: TransferResponse? = null,
     val cancelTransfer: CancelTransfer? = null,
-    val heartbeat: HeartbeatMessage? = null
+    val heartbeat: HeartbeatMessage? = null,
+    val avatarUpdate: AvatarUpdateMessage? = null
 ) {
     fun toJson(): String = jsonSerializer.encodeToString(this)
 

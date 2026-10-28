@@ -214,6 +214,15 @@ class TransferControlChannel {
         sendMessage(ControlMessage(type = MessageType.CANCEL_TRANSFER, cancelTransfer = cancel))
     }
 
+    fun sendAvatarUpdate(deviceName: String, avatarEmoji: String? = null, customAvatarBase64: String? = null) {
+        val msg = com.swiftshare.nft.channel.models.AvatarUpdateMessage(
+            deviceName = deviceName,
+            avatarEmoji = avatarEmoji,
+            customAvatarBase64 = customAvatarBase64
+        )
+        sendMessage(ControlMessage(type = MessageType.AVATAR_UPDATE, avatarUpdate = msg))
+    }
+
     fun sendHeartbeat(senderName: String, sequence: Long = 0L) {
         val hb = com.swiftshare.nft.channel.models.HeartbeatMessage(
             timestamp = System.currentTimeMillis(),

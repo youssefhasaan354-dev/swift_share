@@ -12,14 +12,20 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.Image
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +43,7 @@ import com.swiftshare.nft.discovery.models.PeerDevice
 import com.swiftshare.ui.theme.AccentCyan
 import com.swiftshare.ui.theme.PrimaryBlue
 import com.swiftshare.ui.theme.SurfaceBorderDark
+import com.swiftshare.ui.theme.SurfaceCard
 import com.swiftshare.ui.theme.TextPrimary
 import kotlin.math.cos
 import kotlin.math.sin
@@ -127,6 +134,12 @@ fun RadarScanView(
         }
 
         // Center Avatar (Current User Device)
+        val myAvatarEmoji by com.swiftshare.common.LocaleManager.avatarEmoji.collectAsState()
+        val myCustomAvatar by com.swiftshare.common.LocaleManager.customAvatarBase64.collectAsState()
+        val myCustomBitmap = remember(myCustomAvatar) {
+            myCustomAvatar?.let { com.swiftshare.common.AvatarUtils.decodeBase64ToBitmap(it) }
+        }
+
         Box(
             modifier = Modifier
                 .size(64.dp)
@@ -135,10 +148,19 @@ fun RadarScanView(
                 .border(2.dp, TextPrimary, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "⚡",
-                fontSize = 24.sp
-            )
+            if (myCustomBitmap != null) {
+                Image(
+                    bitmap = myCustomBitmap.asImageBitmap(),
+                    contentDescription = "My Avatar",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = myAvatarEmoji,
+                    fontSize = 24.sp
+                )
+            }
         }
 
         // Orbiting Discovered Peers
@@ -146,8 +168,12 @@ fun RadarScanView(
             val angleDeg = (index * (360f / peers.size.coerceAtLeast(1)) + 45f)
             val angleRad = Math.toRadians(angleDeg.toDouble())
             val orbitRadius = 130.dp // distance from center
+            val peerBitmap = remember(peer.customAvatarBase64) {
+                peer.customAvatarBase64?.let { com.swiftshare.common.AvatarUtils.decodeBase64ToBitmap(it) }
+            }
 
-            Box(
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .offset {
                         IntOffset(
@@ -155,18 +181,64 @@ fun RadarScanView(
                             y = (orbitRadius.toPx() * sin(angleRad)).toInt()
                         )
                     }
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(PrimaryBlue.copy(alpha = 0.9f))
-                    .border(2.dp, AccentCyan, CircleShape)
-                    .clickable { onPeerSelected(peer) },
-                contentAlignment = Alignment.Center
+                    .clickable { onPeerSelected(peer) }
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(PrimaryBlue.copy(alpha = 0.9f))
+                        .border(2.dp, AccentCyan, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (peerBitmap != null) {
+                        Image(
+                            bitmap = peerBitmap.asImageBitmap(),
+                            contentDescription = peer.deviceName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (!peer.avatarEmoji.isNullOrBlank()) {
+                        Text(
+                            text = peer.avatarEmoji,
+                            fontSize = 22.sp
+                        )
+                    } else {
+                        Text(
+                            text = peer.deviceName.take(2).uppercase(),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    // Device type badge (Android / iOS / PC / Web)
+                    val devIcon = when (peer.deviceType.lowercase()) {
+                        "ios" -> "🍏"
+                        "pc" -> "💻"
+                        "web" -> "🌐"
+                        else -> "📱"
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(SurfaceCard)
+                            .border(1.dp, AccentCyan, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = devIcon, fontSize = 9.sp)
+                    }
+                }
+
                 Text(
-                    text = peer.deviceName.take(2).uppercase(),
+                    text = peer.deviceName.take(8),
                     color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }

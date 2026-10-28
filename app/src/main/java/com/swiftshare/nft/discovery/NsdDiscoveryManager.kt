@@ -110,13 +110,15 @@ class NsdDiscoveryManager(private val context: Context) {
                     val packet = DatagramPacket(buffer, buffer.size)
                     socket.receive(packet)
                     val message = String(packet.data, 0, packet.length).trim()
-                    // Format: SWIFTSHARE_BEACON|<deviceName>|<port>|<token>
+                    // Format: SWIFTSHARE_BEACON|<deviceName>|<port>|<token>|<deviceType>|<avatarEmoji>
                     if (message.startsWith("SWIFTSHARE_BEACON|")) {
                         val parts = message.split("|")
                         if (parts.size >= 4) {
                             val senderName = parts[1]
                             val senderPort = parts[2].toIntOrNull() ?: Constants.PORT_CONTROL_HTTP
                             val token = parts[3]
+                            val devType = if (parts.size >= 5 && parts[4].isNotBlank()) parts[4] else "Android"
+                            val emoji = if (parts.size >= 6 && parts[5].isNotBlank()) parts[5] else null
                             val senderIp = packet.address.hostAddress ?: continue
                             val peer = PeerDevice(
                                 id = "$senderIp:$senderPort",
@@ -124,7 +126,10 @@ class NsdDiscoveryManager(private val context: Context) {
                                 ip = senderIp,
                                 port = senderPort,
                                 sessionToken = token,
-                                connectionType = PeerConnectionType.SAME_LAN_NSD
+                                deviceType = devType,
+                                avatarEmoji = emoji,
+                                connectionType = PeerConnectionType.SAME_LAN_NSD,
+                                lastSeenTimestamp = System.currentTimeMillis()
                             )
                             val current = _discoveredPeers.value.toMutableMap()
                             current[peer.id] = peer
@@ -139,13 +144,20 @@ class NsdDiscoveryManager(private val context: Context) {
         }
     }
 
-    fun startUdpBroadcasting(deviceName: String, port: Int, sessionToken: String) {
+    fun startUdpBroadcasting(
+        deviceName: String,
+        port: Int,
+        sessionToken: String,
+        deviceType: String = "Android",
+        avatarEmoji: String? = null
+    ) {
         udpBroadcastJob = scope.launch {
             var socket: DatagramSocket? = null
             try {
                 socket = DatagramSocket()
                 socket.broadcast = true
-                val payload = "SWIFTSHARE_BEACON|$deviceName|$port|$sessionToken".toByteArray()
+                val emojiStr = avatarEmoji ?: ""
+                val payload = "SWIFTSHARE_BEACON|$deviceName|$port|$sessionToken|$deviceType|$emojiStr".toByteArray()
                 val broadcastAddress = InetAddress.getByName("255.255.255.255")
                 val packet = DatagramPacket(payload, payload.size, broadcastAddress, Constants.PORT_UDP_BROADCAST)
 
