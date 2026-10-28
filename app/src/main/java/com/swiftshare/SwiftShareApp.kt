@@ -33,6 +33,7 @@ class SwiftShareApp : Application() {
         createNotificationChannels()
         com.swiftshare.common.LocaleManager.init(this)
         com.swiftshare.common.StorageDestinationManager.init(this)
+        com.swiftshare.common.SettingsManager.init(this)
     }
 
     private fun createNotificationChannels() {

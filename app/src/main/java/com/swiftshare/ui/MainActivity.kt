@@ -51,6 +51,8 @@ import com.swiftshare.common.AppLanguage
 import com.swiftshare.common.LocalAppStrings
 import com.swiftshare.common.LocaleManager
 import com.swiftshare.common.PermissionManager
+import com.swiftshare.common.SettingsManager
+import com.swiftshare.common.ThemeMode
 import com.swiftshare.explorer.MediaItem
 import com.swiftshare.service.TransferForegroundService
 import com.swiftshare.ui.screens.CleanerScreen
@@ -64,6 +66,7 @@ import com.swiftshare.ui.screens.MediaPlayerScreen
 import com.swiftshare.ui.screens.PcConnectScreen
 import com.swiftshare.ui.screens.PhoneCloneScreen
 import com.swiftshare.ui.screens.RadarScanScreen
+import com.swiftshare.ui.screens.SettingsScreen
 import com.swiftshare.ui.screens.StorageAnalyzerScreen
 import com.swiftshare.ui.screens.SafeBoxScreen
 import com.swiftshare.ui.screens.StatusSaverScreen
@@ -106,6 +109,12 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val currentLang by LocaleManager.currentLanguage.collectAsState()
+            val themeMode by SettingsManager.themeMode.collectAsState()
+            val isDark = when (themeMode) {
+                ThemeMode.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+            }
             val layoutDirection = if (currentLang == AppLanguage.AR) {
                 androidx.compose.ui.unit.LayoutDirection.Rtl
             } else {
@@ -116,7 +125,7 @@ class MainActivity : FragmentActivity() {
                 LocalLayoutDirection provides layoutDirection,
                 LocalAppStrings provides LocaleManager.getStrings()
             ) {
-                SwiftShareTheme {
+                SwiftShareTheme(darkTheme = isDark) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = BackgroundDark
@@ -560,6 +569,14 @@ class MainActivity : FragmentActivity() {
                 composable("storage_analyzer") {
                     StorageAnalyzerScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                // 19. Full Settings Screen (Theme, Language, Notifications, Destination, Profile)
+                composable("settings") {
+                    SettingsScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) }
                     )
                 }
             }
