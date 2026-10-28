@@ -710,7 +710,7 @@ class HighSpeedDataChannel {
                             }
                         }
                     } catch (e: Exception) {
-                        if (!isCancelled.get()) throw e
+                        if (!isCancelled.get() && channel.isOpen) throw e
                     }
                 }
                 workerJobs.add(job)

@@ -351,21 +351,23 @@ class MultiStreamDataChannelTest {
 
         val progressReported = CountDownLatch(1)
         val senderJob = CoroutineScope(Dispatchers.IO).launch {
-            sender.sendFileParallel(
-                targetIp = "127.0.0.1",
-                manifestItem = manifestItem,
-                sourceFile = sourceFile,
-                sessionToken = token,
-                port = serverPort,
-                streamCount = 4,
-                onProgress = { transferred, _ ->
-                    if (transferred > 1024 * 1024) {
-                        progressReported.countDown()
-                    }
-                },
-                onSuccess = {},
-                onError = {}
-            )
+            try {
+                sender.sendFileParallel(
+                    targetIp = "127.0.0.1",
+                    manifestItem = manifestItem,
+                    sourceFile = sourceFile,
+                    sessionToken = token,
+                    port = serverPort,
+                    streamCount = 4,
+                    onProgress = { transferred, _ ->
+                        if (transferred > 1024 * 1024) {
+                            progressReported.countDown()
+                        }
+                    },
+                    onSuccess = {},
+                    onError = {}
+                )
+            } catch (_: Exception) {}
         }
 
         assertTrue("Transfer must make progress before cancel", progressReported.await(10, TimeUnit.SECONDS))

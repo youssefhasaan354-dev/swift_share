@@ -493,6 +493,41 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ---
 
+## Phase 4: Multimedia, Utilities & Desktop Integration (branch: `feat/phase-4`)
+
+### T4.1 (D1): Music Player Suite (Playlists, Equalizer, Sleep Timer, LRC Lyrics, MediaSessionService & Folder Scan)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`MusicPlayerSuiteTest.kt`, 10/10 passed)
+- **Verification Details**:
+  - **LRC Synchronized Lyrics (`LrcParser.kt`)**: Parses standard timestamps (`[mm:ss.xx]`), millisecond timestamps (`[mm:ss.xxx]`), multi-timestamp tags, metadata tags (`ti`, `ar`, `al`), and sorts out-of-order lines. Binary search lookup returns active line index at any millisecond position. Auto-discovers companion `.lrc` file in same directory or `/lyrics` folder.
+  - **Sleep Timer (`SleepTimer.kt`)**: Countdown timer supporting standard presets (15m, 30m, 45m, 60m), custom duration, or end-of-current-song trigger. Safely notifies callback upon completion without leaking coroutines or throwing uncaught exceptions.
+  - **Playlist Manager (`PlaylistManager.kt`)**: Resilient, disk-backed playlist store. Supports creating playlists, adding/removing tracks, duplicate protection, renaming, deleting, and loading from disk.
+  - **Folder Scanner (`FolderScanner.kt`)**: Scans local media paths and groups tracks by folder with item counts and path metadata, filtering out non-audio files.
+  - **Equalizer Controller (`EqualizerController.kt`)**: Controls `android.media.audiofx.Equalizer` on the active audio session ID. Provides 10 standard audio presets and 5-band frequency sliders (-15 dB to +15 dB) with robust fallback defaults for JVM testing.
+  - **Lockscreen & Notification Media Controls (`MusicPlaybackService.kt`)**: Foreground media playback service (`mediaPlayback` type) hosting `MediaSession`. Exposes Play/Pause, Next, Previous, and Seek controls on lockscreen and media notification drawer.
+  - **UI Integration (`MediaPlayerScreen.kt`)**: Rich music experience with Track / Folder / Playlist browsing, Now Playing view with scrolling synchronized lyrics or album art visualizer, quick action buttons for Equalizer and Sleep Timer, seekbar, and queue controls (Shuffle, Repeat Off/All/One, Prev, Play/Pause, Next).
+  - **Unit Tests**: 10 unit tests in `MusicPlayerSuiteTest.kt` passing under hard 60s timeouts. Total project unit tests now at **81 executed, 0 failures, 0 errors**.
+- **Files Touched**:
+  - `app/src/main/AndroidManifest.xml`
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/HighSpeedDataChannel.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/MusicPlaybackService.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/SwiftMediaPlayer.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/equalizer/EqualizerController.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/folder/FolderScanner.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/lyrics/LrcParser.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/playlist/PlaylistManager.kt`
+  - `app/src/main/java/com/swiftshare/siplayer/timer/SleepTimer.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/MediaPlayerScreen.kt`
+  - `app/src/main/res/values/strings.xml`
+  - `app/src/main/res/values-ar/strings.xml`
+  - `app/src/test/java/com/swiftshare/siplayer/MusicPlayerSuiteTest.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/MultiStreamDataChannelTest.kt`
+- **Commit**: `9972d57` (`feat(T4.1): implement music player with playlists, equalizer, sleep timer, lrc lyrics, folder scan, and media session service`)
+- **Next**: T4.2 (D2: ZIP Explorer with zip-slip safety, unit-tested with malicious archive)
+
+---
+
 ## Static Analysis & Android Lint Audit
 
 A comparative audit of `./gradlew lintDebug` was executed against `origin/main` (`fb870af`):

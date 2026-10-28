@@ -74,6 +74,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:targetApi="upside_down_cake" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:targetApi="upside_down_cake" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:targetApi="upside_down_cake" />
 
     <application
         android:name=".SwiftShareApp"
@@ -118,6 +119,13 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|dataSync" />
+
+        <!-- Music Playback Foreground Service -->
+        <service
+            android:name=".siplayer.MusicPlaybackService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!-- FileProvider for secure APK and file sharing -->
         <provider

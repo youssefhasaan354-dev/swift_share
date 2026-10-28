@@ -95,4 +95,11 @@
     <string name="qr_tab_web">WebShare URL</string>
     <string name="connecting_wifi_direct">Connecting via Wi-Fi Direct…</string>
     <string name="accept_prompt_on_other_device">Please accept the connection prompt on the other device.</string>
+    <string name="tab_playlists">Playlists</string>
+    <string name="create_playlist">New Playlist</string>
+    <string name="add_to_playlist">Add to Playlist</string>
+    <string name="equalizer">Equalizer</string>
+    <string name="sleep_timer">Sleep Timer</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="no_lyrics_found">No lyrics found for this track</string>
 </resources>

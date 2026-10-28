@@ -80,7 +80,14 @@ data class AppStrings(
     val inviteShareSheetDesc: String,
     val bluetoothNotSupported: String,
     val preparingApk: String,
-    val scanToInstall: String
+    val scanToInstall: String,
+    val tabPlaylists: String = "Playlists",
+    val createPlaylist: String = "New Playlist",
+    val addToPlaylist: String = "Add to Playlist",
+    val equalizer: String = "Equalizer",
+    val sleepTimer: String = "Sleep Timer",
+    val lyrics: String = "Lyrics",
+    val noLyricsFound: String = "No lyrics found for this track"
 )
 
 val EnglishStrings = AppStrings(
@@ -148,7 +155,14 @@ val EnglishStrings = AppStrings(
     inviteShareSheetDesc = "Send app link or installer via WhatsApp, Telegram, etc.",
     bluetoothNotSupported = "Bluetooth is not supported or available on this device.",
     preparingApk = "Preparing SwiftShare APK package…",
-    scanToInstall = "Scan QR to download SwiftShare APK without mobile data"
+    scanToInstall = "Scan QR to download SwiftShare APK without mobile data",
+    tabPlaylists = "Playlists",
+    createPlaylist = "New Playlist",
+    addToPlaylist = "Add to Playlist",
+    equalizer = "Equalizer",
+    sleepTimer = "Sleep Timer",
+    lyrics = "Lyrics",
+    noLyricsFound = "No lyrics found for this track"
 )
 
 val ArabicStrings = AppStrings(
@@ -216,7 +230,14 @@ val ArabicStrings = AppStrings(
     inviteShareSheetDesc = "إرسال رابط التطبيق أو الملف عبر واتساب وتيليجرام",
     bluetoothNotSupported = "البلوتوث غير متوفر أو غير مدعوم على هذا الجهاز.",
     preparingApk = "جارٍ تجهيز ملف التثبيت SwiftShare APK…",
-    scanToInstall = "امسح رمز QR لتنزيل تطبيق SwiftShare مجاناً بدون إنترنت"
+    scanToInstall = "امسح رمز QR لتنزيل تطبيق SwiftShare مجاناً بدون إنترنت",
+    tabPlaylists = "قوائم التشغيل",
+    createPlaylist = "قائمة جديدة",
+    addToPlaylist = "إضافة لقائمة التشغيل",
+    equalizer = "معادل الصوت",
+    sleepTimer = "مؤقت النوم",
+    lyrics = "كلمات الأغنية",
+    noLyricsFound = "لا توجد كلمات متاحة لهذا المقطع"
 )
 
 val LocalAppStrings = compositionLocalOf { EnglishStrings }

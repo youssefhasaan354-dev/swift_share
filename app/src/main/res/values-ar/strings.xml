@@ -95,4 +95,11 @@
     <string name="qr_tab_web">رابط WebShare</string>
     <string name="connecting_wifi_direct">جارٍ الاتصال عبر Wi-Fi Direct…</string>
     <string name="accept_prompt_on_other_device">يرجى قبول طلب الاتصال على الجهاز الآخر.</string>
+    <string name="tab_playlists">قوائم التشغيل</string>
+    <string name="create_playlist">قائمة جديدة</string>
+    <string name="add_to_playlist">إضافة لقائمة التشغيل</string>
+    <string name="equalizer">معادل الصوت</string>
+    <string name="sleep_timer">مؤقت النوم</string>
+    <string name="lyrics">كلمات الأغنية</string>
+    <string name="no_lyrics_found">لا توجد كلمات متاحة لهذا المقطع</string>
 </resources>
