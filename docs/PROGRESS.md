@@ -282,7 +282,122 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/res/values/strings.xml`
   - `app/src/main/res/values-ar/strings.xml`
   - `app/src/test/java/com/swiftshare/nft/discovery/WifiP2pOrchestrationTest.kt`
-- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+- **Commit**: `3bc1919` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+
+---
+
+### T4.3 (D3): Global Search (Files, Apps, History)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`GlobalSearchTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Engine (`GlobalSearchEngine.kt`)**: Concurrent multi-source query across Photos, Videos, Music, Documents, Installed Apps, and Transfer History using `Dispatchers.IO` and `async`. Ranks exact prefix matches highest, supports case-insensitive matching across name and metadata, and provides reactive debounced flow.
+  - **UI Integration (`GlobalSearchScreen.kt`)**: Dedicated full search screen with interactive text field, clear button, category filter chips (All, Photos, Videos, Audio, Documents, Apps, History), result count badge, and direct item actions (open file, launch app, inspect ZIP via ZipViewerDialog, or play in media player).
+  - **HomeScreen Integration**: Global search trigger bar placed prominently below the top header for instant 1-tap search access.
+  - **Unit Tests**: 6 unit tests in `GlobalSearchTest.kt` verifying concurrent querying, category filtering, prefix ranking, grouped category mapping, history transfer status matching, and debounce flow.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt`
+  - `app/src/main/java/com/swiftshare/explorer/search/GlobalSearchEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/GlobalSearchScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/GlobalSearchTest.kt` (new)
+- **Commit**: `1a7c370` (`feat(T4.3): implement global search engine across files, apps, and history with unit tests`)
+
+---
+
+### T4.4 (D4): Storage Analyzer Category Drill-Down & Multi-Select Batch Delete
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`StorageAnalyzerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Analyzer Engine (`StorageAnalyzer.kt`)**: Calculates multi-category disk breakdown (Total, Free, Used, Photos, Videos, Audio, Apps, Documents, Other) via `StatFs` and `MediaStoreRepository`. Exposes per-category drill-down queries (`getCategoryItems`) and batch deletion (`deleteItems`) returning `StorageDeleteResult` with deleted count, freed bytes, and resilient failure tracking.
+  - **UI Integration (`StorageAnalyzerScreen.kt`)**: Visual segmented storage bar with category color codes (Photos, Videos, Audio, Apps, Docs, Other), category breakdown cards, drill-down item list with checkboxes, Select All / Deselect All, and permanent deletion confirmation dialog with freed space toast.
+  - **Navigation Integration**: Wired into `MainActivity.kt` (`storage_analyzer` route) and accessible directly from the `HomeScreen` storage pill and features grid.
+  - **Unit Tests**: 4 unit tests in `StorageAnalyzerTest.kt` verifying accurate byte breakdown calculation, category drill-down filtering, batch deletion success, and error handling for failed item deletions.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/explorer/StorageAnalyzer.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/StorageAnalyzerScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/StorageAnalyzerTest.kt` (new)
+- **Commit**: `3cb9dec` (`feat(T4.4): implement storage analyzer category drill-down and multi-select delete`)
+
+---
+
+### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Details**:
+  - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
+  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/CleanerScreen.kt`
+  - `app/src/test/java/com/swiftshare/cleaner/CleanerEngineTest.kt` (new)
+- **Commit**: `d3f1c1b` (`feat(T4.5): implement cleaner engine for cache, old apks, large files, and duplicates`)
+
+---
+
+### T4.6 (D6): SafeBox (Biometrics, Recovery Question, Password Change, Secure Shredding, Photo Viewer)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
+  - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
+  - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxAuthManager.kt`
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxVault.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SafeBoxScreen.kt`
+  - `app/src/test/java/com/swiftshare/safebox/SafeBoxSecurityTest.kt` (new)
+- **Commit**: `e2a1179` (`feat(T4.6): implement safebox biometrics, recovery question, password change, and secure shredding`)
+
+---
+
+### T4.7 (D7): Settings Screen (Theme Light/Dark/System, Language, Notifications, Destination, Profile)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SettingsManagerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Settings Manager (`SettingsManager.kt`)**: Reactive persistence for `ThemeMode` (System, Dark, Light), `notificationsEnabled`, `soundEnabled`, and `destinationPath`.
+  - **Theming Integration (`Theme.kt` & `MainActivity.kt`)**: Dynamic `SwiftShareTheme` switching between dark and light color schemes based on user preference.
+  - **UI Integration (`SettingsScreen.kt`)**: Full settings screen with Profile & Avatar customization (emojis or compressed photo <= 32KB), Theme mode cards, Language toggle (English / العربية), Notification & Sound switches, Storage volume destination path, and link to storage analyzer.
+  - **Unit Tests**: 4 unit tests in `SettingsManagerTest.kt` testing defaults, theme persistence, notification/sound toggles, and destination path directory creation and persistence.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/common/SettingsManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SettingsScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/theme/Theme.kt`
+  - `app/src/test/java/com/swiftshare/common/SettingsManagerTest.kt` (new)
+- **Commit**: `d070879` (`feat(T4.7): implement comprehensive settings screen with theme, language, and destination controls`)
+
+---
+
+### T4.8 (D8): PC Web Dashboard (Authenticated ZIP Download & Upload)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`WebShareZipTest.kt`, 5/5 passed)
+- **Verification Details**:
+  - **Batch Download All as ZIP (`/api/download/all`)**: Enforces session authentication (401 without cookie). Streams `ZipOutputStream` with MIME `application/zip` containing all queued manifest files.
+  - **Multipart Upload (`/api/upload`)**: Enforces session authentication (401 without cookie). Consumes multipart form data, sanitizes filenames with `SafeFileName.resolveUniqueFile` preventing path traversal escapes, and saves files safely in the upload directory.
+  - **Unit Tests**: 5 unit tests in `WebShareZipTest.kt` testing unauthenticated 401 on ZIP download, authenticated ZIP streaming with `ZipInputStream` validating individual entry names and bytes, unauthenticated 401 on upload, authenticated multipart file upload saving to disk, and malicious path traversal containment (`../../windows_startup.bat` sanitized to upload directory).
+- **Files Touched**:
+  - `app/src/test/java/com/swiftshare/webshare/WebShareZipTest.kt` (new)
+- **Commit**: `bfb3f8c` (`feat(T4.8): implement authenticated pc web dashboard zip download and upload with tests`)
+
+---
+
+### Phase 4 Gate Metrics
+- **Unit Tests**: **118 passed, 0 failures, 0 errors, 0 skipped** across all test suites.
+- **Android Lint**: **0 errors**, BUILD SUCCESSFUL (`lintDebug`).
+- **Compilation**: **BUILD SUCCESSFUL** (`assembleDebug`).
+
 
 ---
 
@@ -303,7 +418,122 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/groupshare/GroupShareEngine.kt`
   - `app/src/main/java/com/swiftshare/ui/screens/GroupShareScreen.kt`
   - `app/src/test/java/com/swiftshare/groupshare/GroupShareEngineTest.kt`
-- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+- **Commit**: `3bc1919` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+
+---
+
+### T4.3 (D3): Global Search (Files, Apps, History)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`GlobalSearchTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Engine (`GlobalSearchEngine.kt`)**: Concurrent multi-source query across Photos, Videos, Music, Documents, Installed Apps, and Transfer History using `Dispatchers.IO` and `async`. Ranks exact prefix matches highest, supports case-insensitive matching across name and metadata, and provides reactive debounced flow.
+  - **UI Integration (`GlobalSearchScreen.kt`)**: Dedicated full search screen with interactive text field, clear button, category filter chips (All, Photos, Videos, Audio, Documents, Apps, History), result count badge, and direct item actions (open file, launch app, inspect ZIP via ZipViewerDialog, or play in media player).
+  - **HomeScreen Integration**: Global search trigger bar placed prominently below the top header for instant 1-tap search access.
+  - **Unit Tests**: 6 unit tests in `GlobalSearchTest.kt` verifying concurrent querying, category filtering, prefix ranking, grouped category mapping, history transfer status matching, and debounce flow.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt`
+  - `app/src/main/java/com/swiftshare/explorer/search/GlobalSearchEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/GlobalSearchScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/GlobalSearchTest.kt` (new)
+- **Commit**: `1a7c370` (`feat(T4.3): implement global search engine across files, apps, and history with unit tests`)
+
+---
+
+### T4.4 (D4): Storage Analyzer Category Drill-Down & Multi-Select Batch Delete
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`StorageAnalyzerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Analyzer Engine (`StorageAnalyzer.kt`)**: Calculates multi-category disk breakdown (Total, Free, Used, Photos, Videos, Audio, Apps, Documents, Other) via `StatFs` and `MediaStoreRepository`. Exposes per-category drill-down queries (`getCategoryItems`) and batch deletion (`deleteItems`) returning `StorageDeleteResult` with deleted count, freed bytes, and resilient failure tracking.
+  - **UI Integration (`StorageAnalyzerScreen.kt`)**: Visual segmented storage bar with category color codes (Photos, Videos, Audio, Apps, Docs, Other), category breakdown cards, drill-down item list with checkboxes, Select All / Deselect All, and permanent deletion confirmation dialog with freed space toast.
+  - **Navigation Integration**: Wired into `MainActivity.kt` (`storage_analyzer` route) and accessible directly from the `HomeScreen` storage pill and features grid.
+  - **Unit Tests**: 4 unit tests in `StorageAnalyzerTest.kt` verifying accurate byte breakdown calculation, category drill-down filtering, batch deletion success, and error handling for failed item deletions.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/explorer/StorageAnalyzer.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/StorageAnalyzerScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/StorageAnalyzerTest.kt` (new)
+- **Commit**: `3cb9dec` (`feat(T4.4): implement storage analyzer category drill-down and multi-select delete`)
+
+---
+
+### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Details**:
+  - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
+  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/CleanerScreen.kt`
+  - `app/src/test/java/com/swiftshare/cleaner/CleanerEngineTest.kt` (new)
+- **Commit**: `d3f1c1b` (`feat(T4.5): implement cleaner engine for cache, old apks, large files, and duplicates`)
+
+---
+
+### T4.6 (D6): SafeBox (Biometrics, Recovery Question, Password Change, Secure Shredding, Photo Viewer)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
+  - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
+  - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxAuthManager.kt`
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxVault.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SafeBoxScreen.kt`
+  - `app/src/test/java/com/swiftshare/safebox/SafeBoxSecurityTest.kt` (new)
+- **Commit**: `e2a1179` (`feat(T4.6): implement safebox biometrics, recovery question, password change, and secure shredding`)
+
+---
+
+### T4.7 (D7): Settings Screen (Theme Light/Dark/System, Language, Notifications, Destination, Profile)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SettingsManagerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Settings Manager (`SettingsManager.kt`)**: Reactive persistence for `ThemeMode` (System, Dark, Light), `notificationsEnabled`, `soundEnabled`, and `destinationPath`.
+  - **Theming Integration (`Theme.kt` & `MainActivity.kt`)**: Dynamic `SwiftShareTheme` switching between dark and light color schemes based on user preference.
+  - **UI Integration (`SettingsScreen.kt`)**: Full settings screen with Profile & Avatar customization (emojis or compressed photo <= 32KB), Theme mode cards, Language toggle (English / العربية), Notification & Sound switches, Storage volume destination path, and link to storage analyzer.
+  - **Unit Tests**: 4 unit tests in `SettingsManagerTest.kt` testing defaults, theme persistence, notification/sound toggles, and destination path directory creation and persistence.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/common/SettingsManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SettingsScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/theme/Theme.kt`
+  - `app/src/test/java/com/swiftshare/common/SettingsManagerTest.kt` (new)
+- **Commit**: `d070879` (`feat(T4.7): implement comprehensive settings screen with theme, language, and destination controls`)
+
+---
+
+### T4.8 (D8): PC Web Dashboard (Authenticated ZIP Download & Upload)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`WebShareZipTest.kt`, 5/5 passed)
+- **Verification Details**:
+  - **Batch Download All as ZIP (`/api/download/all`)**: Enforces session authentication (401 without cookie). Streams `ZipOutputStream` with MIME `application/zip` containing all queued manifest files.
+  - **Multipart Upload (`/api/upload`)**: Enforces session authentication (401 without cookie). Consumes multipart form data, sanitizes filenames with `SafeFileName.resolveUniqueFile` preventing path traversal escapes, and saves files safely in the upload directory.
+  - **Unit Tests**: 5 unit tests in `WebShareZipTest.kt` testing unauthenticated 401 on ZIP download, authenticated ZIP streaming with `ZipInputStream` validating individual entry names and bytes, unauthenticated 401 on upload, authenticated multipart file upload saving to disk, and malicious path traversal containment (`../../windows_startup.bat` sanitized to upload directory).
+- **Files Touched**:
+  - `app/src/test/java/com/swiftshare/webshare/WebShareZipTest.kt` (new)
+- **Commit**: `bfb3f8c` (`feat(T4.8): implement authenticated pc web dashboard zip download and upload with tests`)
+
+---
+
+### Phase 4 Gate Metrics
+- **Unit Tests**: **118 passed, 0 failures, 0 errors, 0 skipped** across all test suites.
+- **Android Lint**: **0 errors**, BUILD SUCCESSFUL (`lintDebug`).
+- **Compilation**: **BUILD SUCCESSFUL** (`assembleDebug`).
+
 
 ---
 
@@ -358,7 +588,122 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
   - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
   - `app/src/test/java/com/swiftshare/webshare/WebAuthTest.kt`
-- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+- **Commit**: `3bc1919` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+
+---
+
+### T4.3 (D3): Global Search (Files, Apps, History)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`GlobalSearchTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Engine (`GlobalSearchEngine.kt`)**: Concurrent multi-source query across Photos, Videos, Music, Documents, Installed Apps, and Transfer History using `Dispatchers.IO` and `async`. Ranks exact prefix matches highest, supports case-insensitive matching across name and metadata, and provides reactive debounced flow.
+  - **UI Integration (`GlobalSearchScreen.kt`)**: Dedicated full search screen with interactive text field, clear button, category filter chips (All, Photos, Videos, Audio, Documents, Apps, History), result count badge, and direct item actions (open file, launch app, inspect ZIP via ZipViewerDialog, or play in media player).
+  - **HomeScreen Integration**: Global search trigger bar placed prominently below the top header for instant 1-tap search access.
+  - **Unit Tests**: 6 unit tests in `GlobalSearchTest.kt` verifying concurrent querying, category filtering, prefix ranking, grouped category mapping, history transfer status matching, and debounce flow.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt`
+  - `app/src/main/java/com/swiftshare/explorer/search/GlobalSearchEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/GlobalSearchScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/GlobalSearchTest.kt` (new)
+- **Commit**: `1a7c370` (`feat(T4.3): implement global search engine across files, apps, and history with unit tests`)
+
+---
+
+### T4.4 (D4): Storage Analyzer Category Drill-Down & Multi-Select Batch Delete
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`StorageAnalyzerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Analyzer Engine (`StorageAnalyzer.kt`)**: Calculates multi-category disk breakdown (Total, Free, Used, Photos, Videos, Audio, Apps, Documents, Other) via `StatFs` and `MediaStoreRepository`. Exposes per-category drill-down queries (`getCategoryItems`) and batch deletion (`deleteItems`) returning `StorageDeleteResult` with deleted count, freed bytes, and resilient failure tracking.
+  - **UI Integration (`StorageAnalyzerScreen.kt`)**: Visual segmented storage bar with category color codes (Photos, Videos, Audio, Apps, Docs, Other), category breakdown cards, drill-down item list with checkboxes, Select All / Deselect All, and permanent deletion confirmation dialog with freed space toast.
+  - **Navigation Integration**: Wired into `MainActivity.kt` (`storage_analyzer` route) and accessible directly from the `HomeScreen` storage pill and features grid.
+  - **Unit Tests**: 4 unit tests in `StorageAnalyzerTest.kt` verifying accurate byte breakdown calculation, category drill-down filtering, batch deletion success, and error handling for failed item deletions.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/explorer/StorageAnalyzer.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/StorageAnalyzerScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/StorageAnalyzerTest.kt` (new)
+- **Commit**: `3cb9dec` (`feat(T4.4): implement storage analyzer category drill-down and multi-select delete`)
+
+---
+
+### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Details**:
+  - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
+  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/CleanerScreen.kt`
+  - `app/src/test/java/com/swiftshare/cleaner/CleanerEngineTest.kt` (new)
+- **Commit**: `d3f1c1b` (`feat(T4.5): implement cleaner engine for cache, old apks, large files, and duplicates`)
+
+---
+
+### T4.6 (D6): SafeBox (Biometrics, Recovery Question, Password Change, Secure Shredding, Photo Viewer)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
+  - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
+  - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxAuthManager.kt`
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxVault.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SafeBoxScreen.kt`
+  - `app/src/test/java/com/swiftshare/safebox/SafeBoxSecurityTest.kt` (new)
+- **Commit**: `e2a1179` (`feat(T4.6): implement safebox biometrics, recovery question, password change, and secure shredding`)
+
+---
+
+### T4.7 (D7): Settings Screen (Theme Light/Dark/System, Language, Notifications, Destination, Profile)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SettingsManagerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Settings Manager (`SettingsManager.kt`)**: Reactive persistence for `ThemeMode` (System, Dark, Light), `notificationsEnabled`, `soundEnabled`, and `destinationPath`.
+  - **Theming Integration (`Theme.kt` & `MainActivity.kt`)**: Dynamic `SwiftShareTheme` switching between dark and light color schemes based on user preference.
+  - **UI Integration (`SettingsScreen.kt`)**: Full settings screen with Profile & Avatar customization (emojis or compressed photo <= 32KB), Theme mode cards, Language toggle (English / العربية), Notification & Sound switches, Storage volume destination path, and link to storage analyzer.
+  - **Unit Tests**: 4 unit tests in `SettingsManagerTest.kt` testing defaults, theme persistence, notification/sound toggles, and destination path directory creation and persistence.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/common/SettingsManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SettingsScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/theme/Theme.kt`
+  - `app/src/test/java/com/swiftshare/common/SettingsManagerTest.kt` (new)
+- **Commit**: `d070879` (`feat(T4.7): implement comprehensive settings screen with theme, language, and destination controls`)
+
+---
+
+### T4.8 (D8): PC Web Dashboard (Authenticated ZIP Download & Upload)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`WebShareZipTest.kt`, 5/5 passed)
+- **Verification Details**:
+  - **Batch Download All as ZIP (`/api/download/all`)**: Enforces session authentication (401 without cookie). Streams `ZipOutputStream` with MIME `application/zip` containing all queued manifest files.
+  - **Multipart Upload (`/api/upload`)**: Enforces session authentication (401 without cookie). Consumes multipart form data, sanitizes filenames with `SafeFileName.resolveUniqueFile` preventing path traversal escapes, and saves files safely in the upload directory.
+  - **Unit Tests**: 5 unit tests in `WebShareZipTest.kt` testing unauthenticated 401 on ZIP download, authenticated ZIP streaming with `ZipInputStream` validating individual entry names and bytes, unauthenticated 401 on upload, authenticated multipart file upload saving to disk, and malicious path traversal containment (`../../windows_startup.bat` sanitized to upload directory).
+- **Files Touched**:
+  - `app/src/test/java/com/swiftshare/webshare/WebShareZipTest.kt` (new)
+- **Commit**: `bfb3f8c` (`feat(T4.8): implement authenticated pc web dashboard zip download and upload with tests`)
+
+---
+
+### Phase 4 Gate Metrics
+- **Unit Tests**: **118 passed, 0 failures, 0 errors, 0 skipped** across all test suites.
+- **Android Lint**: **0 errors**, BUILD SUCCESSFUL (`lintDebug`).
+- **Compilation**: **BUILD SUCCESSFUL** (`assembleDebug`).
+
 
 ---
 
@@ -545,8 +890,121 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/nft/channel/TransferControlChannel.kt`
   - `app/src/test/java/com/swiftshare/explorer/ZipExplorerTest.kt` (new)
   - `app/src/test/java/com/swiftshare/siplayer/MusicPlayerSuiteTest.kt`
-- **Commit**: `3b99f62` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
-- **Next**: T4.3 (D3: Global Search across files, apps, and history)
+- **Commit**: `3bc1919` (`feat(T4.2): implement zip explorer with zip-slip safety and malicious archive unit tests`)
+
+---
+
+### T4.3 (D3): Global Search (Files, Apps, History)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`GlobalSearchTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Engine (`GlobalSearchEngine.kt`)**: Concurrent multi-source query across Photos, Videos, Music, Documents, Installed Apps, and Transfer History using `Dispatchers.IO` and `async`. Ranks exact prefix matches highest, supports case-insensitive matching across name and metadata, and provides reactive debounced flow.
+  - **UI Integration (`GlobalSearchScreen.kt`)**: Dedicated full search screen with interactive text field, clear button, category filter chips (All, Photos, Videos, Audio, Documents, Apps, History), result count badge, and direct item actions (open file, launch app, inspect ZIP via ZipViewerDialog, or play in media player).
+  - **HomeScreen Integration**: Global search trigger bar placed prominently below the top header for instant 1-tap search access.
+  - **Unit Tests**: 6 unit tests in `GlobalSearchTest.kt` verifying concurrent querying, category filtering, prefix ranking, grouped category mapping, history transfer status matching, and debounce flow.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/common/AppLocalization.kt`
+  - `app/src/main/java/com/swiftshare/data/db/SessionDao.kt`
+  - `app/src/main/java/com/swiftshare/explorer/search/GlobalSearchEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/GlobalSearchScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/GlobalSearchTest.kt` (new)
+- **Commit**: `1a7c370` (`feat(T4.3): implement global search engine across files, apps, and history with unit tests`)
+
+---
+
+### T4.4 (D4): Storage Analyzer Category Drill-Down & Multi-Select Batch Delete
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`StorageAnalyzerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Analyzer Engine (`StorageAnalyzer.kt`)**: Calculates multi-category disk breakdown (Total, Free, Used, Photos, Videos, Audio, Apps, Documents, Other) via `StatFs` and `MediaStoreRepository`. Exposes per-category drill-down queries (`getCategoryItems`) and batch deletion (`deleteItems`) returning `StorageDeleteResult` with deleted count, freed bytes, and resilient failure tracking.
+  - **UI Integration (`StorageAnalyzerScreen.kt`)**: Visual segmented storage bar with category color codes (Photos, Videos, Audio, Apps, Docs, Other), category breakdown cards, drill-down item list with checkboxes, Select All / Deselect All, and permanent deletion confirmation dialog with freed space toast.
+  - **Navigation Integration**: Wired into `MainActivity.kt` (`storage_analyzer` route) and accessible directly from the `HomeScreen` storage pill and features grid.
+  - **Unit Tests**: 4 unit tests in `StorageAnalyzerTest.kt` verifying accurate byte breakdown calculation, category drill-down filtering, batch deletion success, and error handling for failed item deletions.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/explorer/StorageAnalyzer.kt`
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/StorageAnalyzerScreen.kt` (new)
+  - `app/src/test/java/com/swiftshare/explorer/StorageAnalyzerTest.kt` (new)
+- **Commit**: `3cb9dec` (`feat(T4.4): implement storage analyzer category drill-down and multi-select delete`)
+
+---
+
+### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Details**:
+  - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
+  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/CleanerScreen.kt`
+  - `app/src/test/java/com/swiftshare/cleaner/CleanerEngineTest.kt` (new)
+- **Commit**: `d3f1c1b` (`feat(T4.5): implement cleaner engine for cache, old apks, large files, and duplicates`)
+
+---
+
+### T4.6 (D6): SafeBox (Biometrics, Recovery Question, Password Change, Secure Shredding, Photo Viewer)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
+- **Verification Details**:
+  - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
+  - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
+  - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxAuthManager.kt`
+  - `app/src/main/java/com/swiftshare/safebox/SafeBoxVault.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SafeBoxScreen.kt`
+  - `app/src/test/java/com/swiftshare/safebox/SafeBoxSecurityTest.kt` (new)
+- **Commit**: `e2a1179` (`feat(T4.6): implement safebox biometrics, recovery question, password change, and secure shredding`)
+
+---
+
+### T4.7 (D7): Settings Screen (Theme Light/Dark/System, Language, Notifications, Destination, Profile)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SettingsManagerTest.kt`, 4/4 passed)
+- **Verification Details**:
+  - **Settings Manager (`SettingsManager.kt`)**: Reactive persistence for `ThemeMode` (System, Dark, Light), `notificationsEnabled`, `soundEnabled`, and `destinationPath`.
+  - **Theming Integration (`Theme.kt` & `MainActivity.kt`)**: Dynamic `SwiftShareTheme` switching between dark and light color schemes based on user preference.
+  - **UI Integration (`SettingsScreen.kt`)**: Full settings screen with Profile & Avatar customization (emojis or compressed photo <= 32KB), Theme mode cards, Language toggle (English / العربية), Notification & Sound switches, Storage volume destination path, and link to storage analyzer.
+  - **Unit Tests**: 4 unit tests in `SettingsManagerTest.kt` testing defaults, theme persistence, notification/sound toggles, and destination path directory creation and persistence.
+- **Files Touched**:
+  - `app/src/main/java/com/swiftshare/SwiftShareApp.kt`
+  - `app/src/main/java/com/swiftshare/common/SettingsManager.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/HomeScreen.kt`
+  - `app/src/main/java/com/swiftshare/ui/screens/SettingsScreen.kt` (new)
+  - `app/src/main/java/com/swiftshare/ui/theme/Theme.kt`
+  - `app/src/test/java/com/swiftshare/common/SettingsManagerTest.kt` (new)
+- **Commit**: `d070879` (`feat(T4.7): implement comprehensive settings screen with theme, language, and destination controls`)
+
+---
+
+### T4.8 (D8): PC Web Dashboard (Authenticated ZIP Download & Upload)
+- **Status**: DONE
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`WebShareZipTest.kt`, 5/5 passed)
+- **Verification Details**:
+  - **Batch Download All as ZIP (`/api/download/all`)**: Enforces session authentication (401 without cookie). Streams `ZipOutputStream` with MIME `application/zip` containing all queued manifest files.
+  - **Multipart Upload (`/api/upload`)**: Enforces session authentication (401 without cookie). Consumes multipart form data, sanitizes filenames with `SafeFileName.resolveUniqueFile` preventing path traversal escapes, and saves files safely in the upload directory.
+  - **Unit Tests**: 5 unit tests in `WebShareZipTest.kt` testing unauthenticated 401 on ZIP download, authenticated ZIP streaming with `ZipInputStream` validating individual entry names and bytes, unauthenticated 401 on upload, authenticated multipart file upload saving to disk, and malicious path traversal containment (`../../windows_startup.bat` sanitized to upload directory).
+- **Files Touched**:
+  - `app/src/test/java/com/swiftshare/webshare/WebShareZipTest.kt` (new)
+- **Commit**: `bfb3f8c` (`feat(T4.8): implement authenticated pc web dashboard zip download and upload with tests`)
+
+---
+
+### Phase 4 Gate Metrics
+- **Unit Tests**: **118 passed, 0 failures, 0 errors, 0 skipped** across all test suites.
+- **Android Lint**: **0 errors**, BUILD SUCCESSFUL (`lintDebug`).
+- **Compilation**: **BUILD SUCCESSFUL** (`assembleDebug`).
 
 ---
 
