@@ -217,7 +217,7 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Details**:
   - **Receiver Transfer Offer Dialog**: `RadarScanScreen` observes `viewModel.incomingTransferOffer` and renders an `AlertDialog` displaying "Allow <nickname> to send N files (X MB)?" with "Allow" (calls `acceptIncomingOffer`) and "Decline" (calls `rejectIncomingOffer`).
   - **Free Space Enforcement**: `SwiftShareViewModel` checks `freeBytes < offer.totalBytes + 50MB` safety headroom before presenting the offer, immediately rejecting with `NOT_ENOUGH_SPACE` reason if space is insufficient.
-  - **Item Deduplication (Defect 2 Fix - Verified by Real JVM Tests `DeduplicationTest.kt`)**:
+  - **Item Deduplication (Defect 2 Fix - Verified by Real JVM Tests `DeduplicationTest.kt` - Commit `c14e256`)**:
     - Replaced buggy name-only deduplication (which silently skipped different files sharing the same name) with `FileDeduplicator` querying through `ReceivedFilePublisher.findExisting(name)`.
     - Strict skip criteria: ONLY skips if file name AND size AND (matching or absent) SHA-256 match.
     - Different size OR different SHA-256 disambiguates via `SafeFileName.resolveUniqueName` to `"name (1).ext"`, registering with `HighSpeedDataChannel` so the file is received cleanly without overwriting.
@@ -257,7 +257,7 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
   - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
   - `app/src/main/java/com/swiftshare/common/ApkInstaller.kt`
   - `app/src/test/java/com/swiftshare/nft/channel/DataChannelPublisherTest.kt`
-- **Commit**: pending commit 1
+- **Commit**: `24f609c` (`fix(T2.4): wire ReceivedFilePublisher and app-specific parts directory to data channel`)
 
 ---
 
@@ -469,22 +469,24 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Command**: `./gradlew.bat lintDebug testDebugUnitTest assembleDebug`
 - **Verification Mode**: VERIFIED BY FRESH BUILD & TEST EXECUTION (55 actionable tasks executed)
 - **Gate Metrics**:
-  - **Unit Tests**: **62 executed, 0 failures, 0 errors** across 15 test suites:
+  - **Unit Tests**: **71 executed, 0 failures, 0 errors** across 17 test suites:
     - `ApkSecurityTest`: 2 tests passed
     - `AppLoggerTest`: 2 tests passed
     - `AvatarTest`: 5 tests passed
+    - `DataChannelPublisherTest`: 3 tests passed
+    - `DataChannelTokenTest`: 8 tests passed
+    - `DeduplicationTest`: 6 tests passed
     - `DistinctPortTest`: 2 tests passed
+    - `GroupShareEngineTest`: 1 test passed
+    - `MultiStreamDataChannelTest`: 9 tests passed
     - `PermissionGuideTest`: 2 tests passed
+    - `RoomMigrationTest`: 2 tests passed
     - `SafeFileNameTest`: 9 tests passed
     - `ScopedStorageTest`: 3 tests passed
     - `StorageDestinationTest`: 3 tests passed
-    - `RoomMigrationTest`: 2 tests passed
-    - `GroupShareEngineTest`: 1 test passed
-    - `DataChannelTokenTest`: 8 tests passed
-    - `MultiStreamDataChannelTest`: 9 tests passed
     - `TransferControlChannelTest`: 7 tests passed
-    - `WifiP2pOrchestrationTest`: 2 tests passed
     - `WebAuthTest`: 5 tests passed
+    - `WifiP2pOrchestrationTest`: 2 tests passed
   - **Android Lint**:
     - **Lint Errors: 0** (Maintained 0 errors).
   - **APK Assembly**: `assembleDebug` passed cleanly.
