@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 //   • Port 2999 — JSON control & HTTP REST (manifest, upload, download, thumbnail)
 //   • Port 2998 — binary stream (zero-copy NIO channel)
 //   • mDNS     — _swiftshare._tcp. Bonjour service discovery
+//   • WebShare  — Safari / Browser zero-install fallback at /webshare
 // ─────────────────────────────────────────────────────────────────────────────
 
 class SwiftShareDevice {
@@ -66,6 +67,33 @@ class SwiftShareClient {
   static const Duration _scanTimeout = Duration(seconds: 8);
 
   MDnsClient? _mdns;
+  String? _sessionCookie;
+
+  String? get sessionCookie => _sessionCookie;
+
+  /// Authenticate with the host device PIN to obtain a session cookie.
+  Future<bool> authenticateWithPin(SwiftShareDevice device, String pin) async {
+    final url = '${device.baseUrl}/api/auth/pin';
+    try {
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'pin': pin.trim()}),
+      ).timeout(const Duration(seconds: 6));
+
+      if (res.statusCode == 200) {
+        final rawCookie = res.headers['set-cookie'];
+        if (rawCookie != null) {
+          final cookieParts = rawCookie.split(';').first;
+          _sessionCookie = cookieParts;
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Discover SwiftShare devices on the local network via Bonjour/mDNS.
   Future<List<SwiftShareDevice>> discoverDevices() async {
@@ -80,11 +108,9 @@ class SwiftShareClient {
       await for (final PtrResourceRecord ptr in _mdns!
           .lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer(_serviceType))
           .timeout(_scanTimeout, onTimeout: (_) {})) {
-        // Resolve SRV (port + hostname)
         await for (final SrvResourceRecord srv in _mdns!
             .lookup<SrvResourceRecord>(ResourceRecordQuery.service(ptr.domainName))
             .timeout(const Duration(seconds: 2), onTimeout: (_) {})) {
-          // Resolve A (IPv4 address)
           await for (final IPAddressResourceRecord ip in _mdns!
               .lookup<IPAddressResourceRecord>(ResourceRecordQuery.addressIPv4(srv.target))
               .timeout(const Duration(seconds: 2), onTimeout: (_) {})) {
@@ -109,7 +135,6 @@ class SwiftShareClient {
       debugPrint('[SwiftShareClient] mDNS discovery error: $e');
     }
 
-    // Fallback: try common LAN subnet scan if mDNS found nothing
     if (devices.isEmpty) {
       final fallback = await _fallbackLanScan();
       devices.addAll(fallback);
@@ -118,10 +143,8 @@ class SwiftShareClient {
     return devices;
   }
 
-  /// Quick sweep of common LAN addresses for port 2999 (fallback when mDNS unavailable).
   Future<List<SwiftShareDevice>> _fallbackLanScan() async {
     final devices = <SwiftShareDevice>[];
-    // Get local IP to derive subnet
     final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
     for (final iface in interfaces) {
       for (final addr in iface.addresses) {
@@ -129,7 +152,6 @@ class SwiftShareClient {
         if (parts.length != 4 || parts[0] == '127') continue;
         final subnet = '${parts[0]}.${parts[1]}.${parts[2]}';
 
-        // Scan 1–254 in parallel batches of 32
         for (int base = 1; base <= 254; base += 32) {
           await Future.wait(List.generate(32, (i) async {
             final host = '$subnet.${base + i}';
@@ -138,7 +160,6 @@ class SwiftShareClient {
               final socket = await Socket.connect(host, _controlPort,
                   timeout: const Duration(milliseconds: 300));
               socket.destroy();
-              // Try to get device name from manifest
               try {
                 final res = await http.get(Uri.parse('http://$host:$_controlPort/api/manifest'))
                     .timeout(const Duration(seconds: 2));
@@ -153,7 +174,7 @@ class SwiftShareClient {
             } catch (_) {}
           }));
         }
-        return devices; // Only scan one interface
+        return devices;
       }
     }
     return devices;
@@ -161,8 +182,13 @@ class SwiftShareClient {
 
   /// Fetch the file manifest from a connected device.
   Future<List<SwiftShareFileInfo>> fetchManifest(SwiftShareDevice device) async {
-    final url = '${device.baseUrl}/api/manifest?token=${Uri.encodeQueryComponent(device.sessionToken)}';
-    final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    final url = '${device.baseUrl}/api/manifest';
+    final headers = <String, String>{};
+    if (_sessionCookie != null) {
+      headers['Cookie'] = _sessionCookie!;
+    }
+
+    final res = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 10));
     if (res.statusCode != 200) throw Exception('Manifest fetch failed: ${res.statusCode}');
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final files = (data['files'] as List<dynamic>?) ?? [];
@@ -177,10 +203,13 @@ class SwiftShareClient {
   Future<File> downloadFile(SwiftShareDevice device, SwiftShareFileInfo fileInfo, {
     void Function(int received, int total)? onProgress,
   }) async {
-    final url = '${device.baseUrl}/api/download/${fileInfo.fileId}?token=${Uri.encodeQueryComponent(device.sessionToken)}';
+    final url = '${device.baseUrl}/api/download/${fileInfo.fileId}';
     final request = http.Request('GET', Uri.parse(url));
-    final response = await http.Client().send(request).timeout(const Duration(minutes: 10));
+    if (_sessionCookie != null) {
+      request.headers['Cookie'] = _sessionCookie!;
+    }
 
+    final response = await http.Client().send(request).timeout(const Duration(minutes: 10));
     if (response.statusCode != 200) throw Exception('Download failed: ${response.statusCode}');
 
     final tempDir = await _getDownloadDirectory();
@@ -206,10 +235,12 @@ class SwiftShareClient {
     for (final file in files) {
       final fileBytes = await file.readAsBytes();
       final request = http.MultipartRequest('POST', Uri.parse('${device.baseUrl}/api/upload'));
+      if (_sessionCookie != null) {
+        request.headers['Cookie'] = _sessionCookie!;
+      }
       request.files.add(http.MultipartFile.fromBytes(
         'file', fileBytes, filename: file.path.split('/').last,
       ));
-      request.fields['token'] = device.sessionToken;
 
       final streamed = await http.Client().send(request).timeout(const Duration(minutes: 10));
       if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
@@ -218,7 +249,6 @@ class SwiftShareClient {
     }
   }
 
-  /// Open iOS file picker and send selected files to device.
   Future<void> sendFilesFromIos(SwiftShareDevice device, BuildContext context) async {
     final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: false, withReadStream: false);
     if (result == null || result.files.isEmpty) return;
@@ -246,7 +276,6 @@ class SwiftShareClient {
     }
   }
 
-  /// Browse and download files from the Android device.
   Future<void> browseDeviceFiles(SwiftShareDevice device, BuildContext context) async {
     try {
       final manifest = await fetchManifest(device);
@@ -312,7 +341,12 @@ class _FileListSheet extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: f.thumbnailUrl != null
-                        ? Image.network(f.thumbnailUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Text('📄', style: TextStyle(fontSize: 22)))
+                        ? Image.network(
+                            f.thumbnailUrl!,
+                            headers: client.sessionCookie != null ? {'Cookie': client.sessionCookie!} : null,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Text('📄', style: TextStyle(fontSize: 22))
+                          )
                         : const Center(child: Text('📄', style: TextStyle(fontSize: 22))),
                   ),
                 ),

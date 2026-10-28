@@ -85,7 +85,7 @@ class _SwiftShareHomeScreenState extends State<SwiftShareHomeScreen> {
                   ]),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Scan button
               SizedBox(
@@ -104,7 +104,31 @@ class _SwiftShareHomeScreenState extends State<SwiftShareHomeScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Zero-install Safari tip card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF131B2E),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF23314E)),
+                ),
+                child: const Row(
+                  children: [
+                    Text('💡', style: TextStyle(fontSize: 18)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'You can also open Safari on this iPhone and browse to http://<phone-ip>:2999/webshare for instant transfer without installing an app.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Device list
               const Text('Nearby Devices', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
@@ -145,7 +169,7 @@ class _SwiftShareHomeScreenState extends State<SwiftShareHomeScreen> {
                               trailing: isConnected
                                   ? const Text('Connected', style: TextStyle(color: Color(0xFF10B981), fontSize: 12, fontWeight: FontWeight.w600))
                                   : ElevatedButton(
-                                      onPressed: () => _connectToDevice(device),
+                                      onPressed: () => _promptPinAndConnect(device),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF1A4FFF),
                                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -169,16 +193,70 @@ class _SwiftShareHomeScreenState extends State<SwiftShareHomeScreen> {
     );
   }
 
-  Future<void> _connectToDevice(SwiftShareDevice device) async {
-    setState(() => _connected = device);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Connected to ${device.name}'),
-        backgroundColor: const Color(0xFF10B981),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  Future<void> _promptPinAndConnect(SwiftShareDevice device) async {
+    final pinController = TextEditingController();
+    final shouldConnect = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF131B2E),
+        title: Text('Connect to ${device.name}', style: const TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter the 4-digit PIN shown on the Android device:', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pinController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              style: const TextStyle(fontSize: 18, letterSpacing: 4),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintText: 'PIN',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A4FFF)),
+            child: const Text('Connect', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
+
+    if (shouldConnect == true) {
+      final pin = pinController.text.trim();
+      final success = await _client.authenticateWithPin(device, pin);
+      if (!mounted) return;
+
+      if (success) {
+        setState(() => _connected = device);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connected to ${device.name}'),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Incorrect PIN. Please check the code on your phone.'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 
   @override
