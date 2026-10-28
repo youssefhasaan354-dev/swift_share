@@ -390,6 +390,19 @@ class MainActivity : FragmentActivity() {
                             navController.popBackStack()
                         },
                         onOpen = {
+                            val uriStr = result?.lastPublishedUri
+                            if (!uriStr.isNullOrBlank()) {
+                                try {
+                                    val uri = Uri.parse(uriStr)
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, "*/*")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    startActivity(intent)
+                                    return@TransferResultScreen
+                                } catch (_: Exception) {}
+                            }
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(

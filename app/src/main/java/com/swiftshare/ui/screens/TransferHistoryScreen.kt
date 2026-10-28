@@ -520,8 +520,9 @@ private fun SessionItemRow(
     isAr: Boolean,
     onInspectApk: (ApkSecurityReport) -> Unit
 ) {
-    val file = remember(item.uriOrPath) { File(item.uriOrPath) }
-    val exists = remember(item.uriOrPath) { file.exists() }
+    val isContentUri = remember(item.uriOrPath) { item.uriOrPath.startsWith("content://") }
+    val file = remember(item.uriOrPath) { if (!isContentUri) File(item.uriOrPath.removePrefix("file://")) else null }
+    val exists = remember(item.uriOrPath) { isContentUri || (file?.exists() == true) }
 
     Row(
         modifier = Modifier
@@ -551,8 +552,12 @@ private fun SessionItemRow(
             if (item.name.endsWith(".apk", ignoreCase = true)) {
                 Button(
                     onClick = {
-                        val report = ApkInstaller.inspectApk(context, file)
-                        onInspectApk(report)
+                        if (file != null && file.exists()) {
+                            val report = ApkInstaller.inspectApk(context, file)
+                            onInspectApk(report)
+                        } else {
+                            ApkInstaller.openUriOrFile(context, item.uriOrPath, item.mimeType)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                     shape = RoundedCornerShape(8.dp),
@@ -563,7 +568,7 @@ private fun SessionItemRow(
             } else {
                 OutlinedButton(
                     onClick = {
-                        ApkInstaller.openFile(context, file, item.mimeType)
+                        ApkInstaller.openUriOrFile(context, item.uriOrPath, item.mimeType)
                     },
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.height(28.dp)

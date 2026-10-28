@@ -231,28 +231,29 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 ---
 
 ### T2.4: TargetSdk 35 Scoped Storage via MediaStore (`IS_PENDING = 1`), SAF Fallback, PartSink & QR Token Expiry
-- **Status**: DONE
-- **Verification Mode**: MIXED (REAL JVM UNIT TESTS + NOT VERIFIED ON PHYSICAL DEVICE)
+- **Status**: PARTIAL
+- **Verification Mode**: MIXED (REAL JVM UNIT TESTS + NOT VERIFIED (needs device))
 - **Verification Details**:
-  - **Verified by Real JVM Tests (`ScopedStorageTest.kt`)**:
-    - QR Token Expiry: Verified `ConnectionPayload` within 10-minute TTL parses successfully, and payload exceeding 10 minutes (`isExpired == true`) is strictly rejected by `QrPayloadManager.parseQrString`.
-    - `PartSink` Positional Writes: Unit tested `FilePartSink` using NIO `FileChannel` positional writes at non-contiguous byte offsets with atomic `flush()` and size assertion.
-    - Resilient Base64 Serialization: `PartFileManager` uses `android.util.Base64` on device with fallback to `java.util.Base64` under JVM tests.
-  - **NOT VERIFIED (NEEDS PHYSICAL DEVICE / REAL MEDIASTORE)**:
-    - Android 10+ (API 29+, targetSdk 35) `MediaStore.MediaColumns.IS_PENDING = 1` during multi-stream transfer, transitioning to `IS_PENDING = 0` on SHA-256 match.
-    - Low-level `android.system.Os.pwrite` directly on Android `ParcelFileDescriptor` (`ParcelFileDescriptorPartSink`).
-    - Multi-APK atomic bundle installation via `PackageInstaller` session (`installSplitApks`).
+  - **Verified by Real JVM Tests (`DataChannelPublisherTest.kt`, `ScopedStorageTest.kt`)**:
+    - Wired `ReceivedFilePublisher` to `HighSpeedDataChannel`: Receives files into app-specific private storage (`partsDir`), invokes injected publisher upon SHA-256 match, and purges `.part` and `.part.meta` on success.
+    - Preserves verified `.part` on publish failure for resume/retry.
+    - Resumption functions cleanly from injected `partsDir`.
+    - Removed `MANAGE_EXTERNAL_STORAGE` permission dependency.
+    - Updated free-space check to 2x totalBytes + 50 MB.
+    - QR Token Expiry and `FilePartSink` positional writes unit tested.
+  - **NOT VERIFIED (needs device)**:
+    - `ProductionReceivedFilePublisher`: Android 10+ (API 29+, targetSdk 35) `MediaStore.MediaColumns.IS_PENDING = 1` during stream copy, transitioning to `IS_PENDING = 0` on SHA-256 match needs validation on a physical phone.
     - SAF (`ACTION_OPEN_DOCUMENT_TREE`) secondary SD card write permissions.
 - **Files Touched**:
-  - `app/src/main/java/com/swiftshare/common/PartSink.kt`
-  - `app/src/main/java/com/swiftshare/common/ScopedStorageManager.kt`
-  - `app/src/main/java/com/swiftshare/common/ApkInstaller.kt`
-  - `app/src/main/java/com/swiftshare/nft/channel/PartFileManager.kt`
-  - `app/src/main/java/com/swiftshare/nft/discovery/models/ConnectionPayload.kt`
-  - `app/src/main/java/com/swiftshare/nft/discovery/QrPayloadManager.kt`
+  - `app/src/main/AndroidManifest.xml`
+  - `app/src/main/java/com/swiftshare/common/ReceivedFilePublisher.kt`
+  - `app/src/main/java/com/swiftshare/nft/channel/HighSpeedDataChannel.kt`
+  - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
   - `app/src/main/java/com/swiftshare/ui/MainActivity.kt`
-  - `app/src/test/java/com/swiftshare/common/ScopedStorageTest.kt`
-- **Commit**: `c1a5d79` and current commit
+  - `app/src/main/java/com/swiftshare/ui/screens/TransferHistoryScreen.kt`
+  - `app/src/main/java/com/swiftshare/common/ApkInstaller.kt`
+  - `app/src/test/java/com/swiftshare/nft/channel/DataChannelPublisherTest.kt`
+- **Commit**: pending commit 1
 
 ---
 

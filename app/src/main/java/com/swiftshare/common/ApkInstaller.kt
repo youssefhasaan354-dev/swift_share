@@ -246,4 +246,25 @@ object ApkInstaller {
             AppLogger.e("ApkInstaller", "Failed to start install activity: ${e.message}", e, notifyUser = true)
         }
     }
+
+    fun openUriOrFile(context: Context, uriOrPath: String, mimeType: String = "*/*") {
+        try {
+            val uri = if (uriOrPath.startsWith("content://")) {
+                Uri.parse(uriOrPath)
+            } else {
+                val f = File(uriOrPath.removePrefix("file://"))
+                if (!f.exists()) return
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f)
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            AppLogger.e("ApkInstaller", "Failed to open $uriOrPath: ${e.message}", e, notifyUser = true)
+        }
+    }
 }

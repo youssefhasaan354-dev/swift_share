@@ -16,6 +16,8 @@ import com.swiftshare.data.entities.TransferRecordEntity
 import com.swiftshare.explorer.MediaItem
 import com.swiftshare.explorer.MediaStoreRepository
 import com.swiftshare.explorer.StorageAnalyzer
+import com.swiftshare.common.ProductionReceivedFilePublisher
+import com.swiftshare.common.ReceivedFilePublisher
 import com.swiftshare.explorer.StorageBreakdown
 import com.swiftshare.groupshare.GroupShareEngine
 import com.swiftshare.nft.channel.HighSpeedDataChannel
@@ -53,6 +55,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
     val mediaRepo = MediaStoreRepository(context)
     val storageAnalyzer = StorageAnalyzer(mediaRepo)
     val discoveryManager = DeviceDiscoveryManager(context)
+    val publisher: ReceivedFilePublisher = ProductionReceivedFilePublisher(context)
     val dataChannel = HighSpeedDataChannel()
     val controlChannel = TransferControlChannel()
     val webShareServer = EmbeddedWebShareServer(context)
@@ -182,7 +185,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                             com.swiftshare.nft.channel.models.MessageType.TRANSFER_OFFER -> {
                                 msg.transferOffer?.let { offer ->
                                     val freeBytes = com.swiftshare.common.StorageDestinationManager.getFreeSpace(context)
-                                    val needed = offer.totalBytes + 50L * 1024L * 1024L // 50 MB safety headroom
+                                    val needed = (offer.totalBytes * 2L) + 50L * 1024L * 1024L // 2x for .part + final MediaStore copy + 50 MB safety headroom
                                     if (freeBytes < needed) {
                                         com.swiftshare.common.AppLogger.e("SwiftShareVM", "Rejecting offer: NOT_ENOUGH_SPACE (free: $freeBytes, needed: $needed)", notifyUser = true)
                                         controlChannel.sendTransferResponse(
@@ -269,13 +272,22 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                     customAvatarBase64 = com.swiftshare.common.LocaleManager.customAvatarBase64.value
                 )
 
-                val rxDestDir = com.swiftshare.common.StorageDestinationManager.getDestinationDirectory(context)
+                val partsDir = context.getExternalFilesDir("parts") ?: File(context.cacheDir, "parts")
                 dataChannel.startReceiverServer(
                     expectedSessionToken = payload.sessionToken,
-                    downloadDir = rxDestDir,
-                    onFileReceived = { file, item ->
+                    partsDir = partsDir,
+                    publisher = publisher,
+                    onPublished = { published, item ->
                         val bId = currentIncomingBatchId ?: "batch_incoming"
-                        recordTransfer(bId, item.fileId, item.name, file.absolutePath, item.size, item.mimeType, isIncoming = true, status = "COMPLETED")
+                        recordTransfer(bId, item.fileId, item.name, published.uriString, item.size, item.mimeType, isIncoming = true, status = "COMPLETED")
+                        lastTransferResult.value = TransferResultData(
+                            batchId = bId,
+                            isSuccess = true,
+                            fileCount = 1,
+                            totalBytes = item.size,
+                            peerName = activePeer.value?.deviceName ?: "Sender",
+                            lastPublishedUri = published.uriString
+                        )
                     },
                     onError = { e ->
                         com.swiftshare.common.AppLogger.e("SwiftShareVM", "Receiver channel failed: ${e.message}", e, notifyUser = true)
@@ -532,5 +544,6 @@ data class TransferResultData(
     val fileCount: Int,
     val totalBytes: Long,
     val peerName: String,
-    val reason: String = "OK"
+    val reason: String = "OK",
+    val lastPublishedUri: String? = null
 )

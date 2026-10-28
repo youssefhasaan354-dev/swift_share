@@ -341,6 +341,12 @@ class MultiStreamDataChannelTest {
         assertTrue(boundLatch.await(5, TimeUnit.SECONDS))
         val serverPort = receiver.serverPort
 
+        // Warm up Dispatchers.IO worker pool so pool expansion isn't counted as a thread leak
+        val warmupJobs = (0..24).map {
+            CoroutineScope(Dispatchers.IO).launch { kotlinx.coroutines.delay(10) }
+        }
+        warmupJobs.forEach { it.join() }
+
         val baselineThreadCount = Thread.activeCount()
 
         val progressReported = CountDownLatch(1)

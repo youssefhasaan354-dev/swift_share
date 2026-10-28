@@ -3,6 +3,9 @@ package com.swiftshare.nft.channel
 import android.os.Environment
 import com.swiftshare.common.AppLogger
 import com.swiftshare.common.Constants
+import com.swiftshare.common.DefaultFilePublisher
+import com.swiftshare.common.PublishedFile
+import com.swiftshare.common.ReceivedFilePublisher
 import com.swiftshare.common.SafeFileName
 import com.swiftshare.nft.channel.models.FileManifestItem
 import com.swiftshare.nft.channel.models.FileTransferStatus
@@ -52,6 +55,8 @@ class HighSpeedDataChannel {
     private var serverJob: Job? = null
     val isCancelled = AtomicBoolean(false)
     private var activeExpectedToken: String? = null
+    private var activePublisher: ReceivedFilePublisher = DefaultFilePublisher(File(System.getProperty("java.io.tmpdir") ?: "."))
+    private var activePartsDir: File = File(System.getProperty("java.io.tmpdir") ?: ".")
 
     private val _transferProgress = MutableStateFlow(TransferProgress())
     val transferProgress: StateFlow<TransferProgress> = _transferProgress.asStateFlow()
@@ -101,14 +106,20 @@ class HighSpeedDataChannel {
     }
 
     fun startReceiverServer(
-        downloadDir: File = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SwiftShare"),
+        partsDir: File? = null,
+        downloadDir: File? = null,
+        publisher: ReceivedFilePublisher? = null,
         port: Int = Constants.PORT_DATA,
         expectedSessionToken: String? = null,
         onBound: ((Int) -> Unit)? = null,
-        onFileReceived: (File, FileManifestItem) -> Unit = { _, _ -> },
+        onPublished: ((PublishedFile, FileManifestItem) -> Unit)? = null,
+        onFileReceived: ((File, FileManifestItem) -> Unit)? = null,
         onError: (Throwable) -> Unit = {}
     ) {
-        if (!downloadDir.exists()) downloadDir.mkdirs()
+        val effectivePartsDir = partsDir ?: (downloadDir ?: File(System.getProperty("java.io.tmpdir") ?: ".", "SwiftShare_parts"))
+        if (!effectivePartsDir.exists()) effectivePartsDir.mkdirs()
+        activePartsDir = effectivePartsDir
+        activePublisher = publisher ?: DefaultFilePublisher(downloadDir ?: effectivePartsDir)
         isCancelled.set(false)
         activeExpectedToken = expectedSessionToken
 
@@ -141,7 +152,7 @@ class HighSpeedDataChannel {
 
                     launch {
                         try {
-                            handleIncomingStream(socketChannel, downloadDir, onFileReceived)
+                            handleIncomingStream(socketChannel, effectivePartsDir, onPublished, onFileReceived)
                         } catch (e: Exception) {
                             if (!isCancelled.get()) {
                                 AppLogger.e("HighSpeedDataChannel", "Stream handling error: ${e.message}", e)
@@ -167,7 +178,8 @@ class HighSpeedDataChannel {
     private suspend fun handleIncomingStream(
         socketChannel: SocketChannel,
         downloadDir: File,
-        onFileReceived: (File, FileManifestItem) -> Unit
+        onPublished: ((PublishedFile, FileManifestItem) -> Unit)?,
+        onFileReceived: ((File, FileManifestItem) -> Unit)?
     ) {
         socketChannel.socket().let { sock ->
             sock.receiveBufferSize = Constants.SOCKET_BUFFER_SIZE
@@ -215,10 +227,10 @@ class HighSpeedDataChannel {
             }
 
             // Stream authenticated successfully. Now process incoming chunks.
-            processChunksOnStream(socketChannel, streamIndex, downloadDir, onFileReceived)
+            processChunksOnStream(socketChannel, streamIndex, downloadDir, onPublished, onFileReceived)
         } else if (DataChannelHeader.isMagic(magicBytes)) {
             // Legacy single-stream fallback handler
-            handleLegacySingleStream(socketChannel, downloadDir, magicBytes, onFileReceived)
+            handleLegacySingleStream(socketChannel, downloadDir, magicBytes, onPublished, onFileReceived)
         } else {
             socketChannel.close()
         }
@@ -235,7 +247,8 @@ class HighSpeedDataChannel {
         socketChannel: SocketChannel,
         streamIndex: Byte,
         downloadDir: File,
-        onFileReceived: (File, FileManifestItem) -> Unit
+        onPublished: ((PublishedFile, FileManifestItem) -> Unit)?,
+        onFileReceived: ((File, FileManifestItem) -> Unit)?
     ) {
         val lastProgress = AtomicLong(System.currentTimeMillis())
         val watchdogJob = scope.launch {
@@ -271,16 +284,21 @@ class HighSpeedDataChannel {
                     }
                 }
 
-                if (header.isEof) {
-                    // Stream has completed sending its chunks
+                if (header.isEof || isCancelled.get()) {
+                    // Stream has completed or transfer cancelled
                     break
                 }
+
+                if (isCancelled.get()) break
 
                 // Initialize shared state for this file if needed
                 val totalChunks = ((manifestItem?.size ?: 0L) + CHUNK_SIZE - 1) / CHUNK_SIZE
                 fileTotalChunks.putIfAbsent(header.fileId, totalChunks.toInt())
 
+                if (isCancelled.get()) break
+
                 val partFile = activePartFiles.computeIfAbsent(header.fileId) {
+                    if (isCancelled.get()) throw java.util.concurrent.CancellationException("Transfer cancelled")
                     val (p, m) = PartFileManager.resolvePartFileAndMeta(
                         downloadDir = downloadDir,
                         fileId = header.fileId,
@@ -306,7 +324,10 @@ class HighSpeedDataChannel {
                     AtomicLong(bitmap.cardinality().toLong() * CHUNK_SIZE)
                 }
 
+                if (isCancelled.get()) break
+
                 val raf = fileRaStreams.computeIfAbsent(header.fileId) {
+                    if (isCancelled.get()) throw java.util.concurrent.CancellationException("Transfer cancelled")
                     RandomAccessFile(partFile, "rw").apply {
                         if (manifestItem != null && length() < manifestItem.size) {
                             setLength(manifestItem.size)
@@ -332,7 +353,7 @@ class HighSpeedDataChannel {
                 val chunkIndex = (header.offset / CHUNK_SIZE).toInt()
                 val alreadyReceived = synchronized(bitmap) { bitmap.get(chunkIndex) }
 
-                if (!alreadyReceived) {
+                if (!alreadyReceived && !isCancelled.get()) {
                     // Positional write via FileChannel directly to disk first
                     val writeBuf = ByteBuffer.wrap(payload)
                     raf.channel.write(writeBuf, header.offset)
@@ -353,7 +374,7 @@ class HighSpeedDataChannel {
                 }
 
                 if (isComplete && finished.compareAndSet(false, true)) {
-                    finalizeFileTransfer(header.fileId, manifestItem, partFile, metaFile, raf, downloadDir, onFileReceived)
+                    finalizeFileTransfer(header.fileId, manifestItem, partFile, metaFile, raf, onPublished, onFileReceived)
                 }
             }
         } finally {
@@ -368,12 +389,16 @@ class HighSpeedDataChannel {
         partFile: File,
         metaFile: File,
         raf: RandomAccessFile,
-        downloadDir: File,
-        onFileReceived: (File, FileManifestItem) -> Unit
+        onPublished: ((PublishedFile, FileManifestItem) -> Unit)?,
+        onFileReceived: ((File, FileManifestItem) -> Unit)?
     ) = withContext(Dispatchers.IO) {
+        try {
+            raf.channel.close()
+        } catch (_: Exception) {}
         try {
             raf.close()
         } catch (_: Exception) {}
+        fileRaStreams.remove(fileId)
 
         // Wait for FileChecksumMessage on control channel with timeout (10s)
         val latch = checksumLatches[fileId]
@@ -404,19 +429,34 @@ class HighSpeedDataChannel {
             throw IOException("SHA-256 mismatch! Expected $expectedSha but computed $actualSha")
         }
 
-        // SHA-256 matches: rename .part to final destination safely and remove .meta
+        // SHA-256 matches: publish via ReceivedFilePublisher
         val targetName = manifestItem?.name ?: partFile.name.removeSuffix(".part")
-        val finalFile = SafeFileName.resolveUniqueFile(downloadDir, targetName)
-        if (!partFile.renameTo(finalFile)) {
-            // Fallback copy if renameTo fails across file boundaries
-            partFile.copyTo(finalFile, overwrite = false)
-            partFile.delete()
-        }
-        metaFile.delete()
-        activePartFiles.remove(fileId)
-        activeMetaFiles.remove(fileId)
+        val mimeType = manifestItem?.mimeType ?: "application/octet-stream"
 
-        manifestItem?.let { onFileReceived(finalFile, it) }
+        try {
+            val published = activePublisher.publish(partFile, targetName, mimeType, "files")
+            // On publish success: ensure .part and .meta are cleaned up
+            for (i in 0..30) {
+                if (!partFile.exists() || partFile.delete()) break
+                Thread.sleep(50)
+            }
+            for (i in 0..30) {
+                if (!metaFile.exists() || metaFile.delete()) break
+                Thread.sleep(50)
+            }
+            activePartFiles.remove(fileId)
+            activeMetaFiles.remove(fileId)
+
+            manifestItem?.let { item ->
+                onPublished?.invoke(published, item)
+                val fileToDeliver = published.file ?: File(activePartsDir, item.name)
+                onFileReceived?.invoke(fileToDeliver, item)
+            }
+        } catch (e: Exception) {
+            AppLogger.e("HighSpeedDataChannel", "Failed to publish received file $targetName: ${e.message}", e)
+            // T2.4 requirement: publish failure keeps the verified .part for retry!
+            throw e
+        }
     }
 
     /**
@@ -428,11 +468,12 @@ class HighSpeedDataChannel {
      * against [activeExpectedToken] before accepting or writing any file bytes. Unauthorized
      * connections without a matching token are immediately closed.
      */
-    private fun handleLegacySingleStream(
+    private suspend fun handleLegacySingleStream(
         socketChannel: SocketChannel,
         downloadDir: File,
         magicBytes: ByteArray,
-        onFileReceived: (File, FileManifestItem) -> Unit
+        onPublished: ((PublishedFile, FileManifestItem) -> Unit)?,
+        onFileReceived: ((File, FileManifestItem) -> Unit)?
     ) {
         val tokenLenBuffer = ByteBuffer.allocate(4)
         while (tokenLenBuffer.hasRemaining()) {
@@ -486,13 +527,9 @@ class HighSpeedDataChannel {
         }
 
         val sanitizedName = SafeFileName.sanitize(fileName)
-        val targetFile = if (offset > 0L) {
-            File(downloadDir, sanitizedName)
-        } else {
-            SafeFileName.resolveUniqueFile(downloadDir, fileName)
-        }
+        val partFile = File(activePartsDir, "$sanitizedName.part")
 
-        val fos = FileOutputStream(targetFile, offset > 0)
+        val fos = FileOutputStream(partFile, offset > 0)
         val fc = fos.channel
         if (offset > 0) fc.position(offset)
 
@@ -517,7 +554,13 @@ class HighSpeedDataChannel {
             name = fileName,
             size = totalSize
         )
-        onFileReceived(targetFile, item)
+        val published = activePublisher.publish(partFile, fileName, "application/octet-stream", "files")
+        if (partFile.exists()) {
+            partFile.delete()
+        }
+        onPublished?.invoke(published, item)
+        val fileToDeliver = published.file ?: File(activePartsDir, item.name)
+        onFileReceived?.invoke(fileToDeliver, item)
     }
 
     suspend fun sendFileParallel(
@@ -740,7 +783,10 @@ class HighSpeedDataChannel {
 
         if (explicitUserCancel) {
             // Explicit user cancel -> close raf and purge .part and .part.meta
-            fileRaStreams.values.forEach { try { it.close() } catch (_: Exception) {} }
+            fileRaStreams.values.forEach {
+                try { it.channel.close() } catch (_: Exception) {}
+                try { it.close() } catch (_: Exception) {}
+            }
             fileRaStreams.clear()
             activePartFiles.values.forEach { file ->
                 try {
@@ -767,7 +813,10 @@ class HighSpeedDataChannel {
         } else {
             // Non-explicit cancel (e.g. socket drop) -> flush .part.meta to disk FIRST and KEEP .part!
             flushActiveMetaToDisk()
-            fileRaStreams.values.forEach { try { it.close() } catch (_: Exception) {} }
+            fileRaStreams.values.forEach {
+                try { it.channel.close() } catch (_: Exception) {}
+                try { it.close() } catch (_: Exception) {}
+            }
             fileRaStreams.clear()
         }
     }
