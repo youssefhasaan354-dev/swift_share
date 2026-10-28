@@ -43,6 +43,12 @@ interface SessionDao {
     @Query("SELECT * FROM transfer_items ORDER BY id DESC")
     fun getAllTransferItems(): Flow<List<TransferItemEntity>>
 
+    @Query("SELECT * FROM transfer_items ORDER BY id DESC")
+    suspend fun getAllTransferItemsSync(): List<TransferItemEntity>
+
+    @Query("SELECT * FROM transfer_items WHERE name LIKE '%' || :query || '%' ORDER BY id DESC")
+    suspend fun searchTransferItems(query: String): List<TransferItemEntity>
+
     @Query("UPDATE transfer_items SET status = :status, transferredBytes = :transferredBytes WHERE sessionId = :sessionId AND fileId = :fileId")
     suspend fun updateItemStatus(sessionId: String, fileId: String, status: String, transferredBytes: Long)
 

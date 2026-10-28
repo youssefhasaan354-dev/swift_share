@@ -246,7 +246,29 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Global Search Bar Trigger ─────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceDark)
+                    .border(1.dp, SurfaceBorderDark, RoundedCornerShape(16.dp))
+                    .clickable { onNavigate("global_search") }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("🔍", fontSize = 16.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = strings.searchHint,
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             // ── Hero Send & Receive Buttons (animated glow) ───────────────────
             Row(

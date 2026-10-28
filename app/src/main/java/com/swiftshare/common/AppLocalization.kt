@@ -87,7 +87,11 @@ data class AppStrings(
     val equalizer: String = "Equalizer",
     val sleepTimer: String = "Sleep Timer",
     val lyrics: String = "Lyrics",
-    val noLyricsFound: String = "No lyrics found for this track"
+    val noLyricsFound: String = "No lyrics found for this track",
+    val globalSearchTitle: String = "Global Search",
+    val searchFilesAppsHistory: String = "Search files, apps, transfers...",
+    val noResultsFound: String = "No matching items found",
+    val searchHintSubtitle: String = "Type a filename, app, or transfer record to search"
 )
 
 val EnglishStrings = AppStrings(
@@ -237,7 +241,11 @@ val ArabicStrings = AppStrings(
     equalizer = "معادل الصوت",
     sleepTimer = "مؤقت النوم",
     lyrics = "كلمات الأغنية",
-    noLyricsFound = "لا توجد كلمات متاحة لهذا المقطع"
+    noLyricsFound = "لا توجد كلمات متاحة لهذا المقطع",
+    globalSearchTitle = "البحث الشامل",
+    searchFilesAppsHistory = "ابحث في الملفات والتطبيقات وسجل النقل…",
+    noResultsFound = "لم يتم العثور على نتائج مطابقة",
+    searchHintSubtitle = "اكتب اسم الملف أو التطبيق أو سجل النقل للبحث الفوري"
 )
 
 val LocalAppStrings = compositionLocalOf { EnglishStrings }

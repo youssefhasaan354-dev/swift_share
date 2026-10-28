@@ -55,6 +55,7 @@ import com.swiftshare.explorer.MediaItem
 import com.swiftshare.service.TransferForegroundService
 import com.swiftshare.ui.screens.CleanerScreen
 import com.swiftshare.ui.screens.FilePickerScreen
+import com.swiftshare.ui.screens.GlobalSearchScreen
 import com.swiftshare.ui.screens.GroupShareScreen
 import com.swiftshare.ui.screens.HomeScreen
 import com.swiftshare.ui.screens.InviteScreen
@@ -543,6 +544,14 @@ class MainActivity : FragmentActivity() {
                 composable("invite") {
                     InviteScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                // 17. Global Search (Files, Apps, History)
+                composable("global_search") {
+                    GlobalSearchScreen(
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { route -> navController.navigate(route) }
                     )
                 }
             }
