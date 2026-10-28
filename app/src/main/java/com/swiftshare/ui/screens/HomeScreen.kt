@@ -107,7 +107,7 @@ fun HomeScreen(
                 FeatureItem("نسخ الهاتف", "ترحيل كامل بضغطة واحدة", "📲", "phone_clone"),
                 FeatureItem("الخزنة المشفرة", "تشفير عتادي AES-256", "🔒", "safebox"),
                 FeatureItem("دعوة الأصدقاء", "بلوتوث أو نقطة اتصال", "🤝", "invite"),
-                FeatureItem("مستعرض الملفات", "مدير الملفات والمجلدات", "📂", "file_picker")
+                FeatureItem("محلل التخزين", "تحليل المساحة والحذف المتعدد", "📊", "storage_analyzer")
             )
         } else {
             listOf(
@@ -121,7 +121,7 @@ fun HomeScreen(
                 FeatureItem("Phone Clone", "1-click Migration", "📲", "phone_clone"),
                 FeatureItem("SafeBox", "AES-256 Vault", "🔒", "safebox"),
                 FeatureItem("Invite Friends", "Bluetooth & Zero-Data", "🤝", "invite"),
-                FeatureItem("File Explorer", "Storage Analyzer", "📂", "file_picker")
+                FeatureItem("Storage Analyzer", "Breakdown & Multi-delete", "📊", "storage_analyzer")
             )
         }
     }
@@ -233,6 +233,7 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(SurfaceDark)
                                 .border(1.dp, SurfaceBorderDark, RoundedCornerShape(10.dp))
+                                .clickable { onNavigate("storage_analyzer") }
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
                             Text(

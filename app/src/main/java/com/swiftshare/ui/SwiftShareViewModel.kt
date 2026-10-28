@@ -53,7 +53,7 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
 
     // Engines
     val mediaRepo = MediaStoreRepository(context)
-    val storageAnalyzer = StorageAnalyzer(mediaRepo)
+    val storageAnalyzer = StorageAnalyzer(mediaRepo = mediaRepo, context = context)
     val discoveryManager = DeviceDiscoveryManager(context)
     val publisher: ReceivedFilePublisher = ProductionReceivedFilePublisher(context)
     val dataChannel = HighSpeedDataChannel()

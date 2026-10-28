@@ -64,6 +64,7 @@ import com.swiftshare.ui.screens.MediaPlayerScreen
 import com.swiftshare.ui.screens.PcConnectScreen
 import com.swiftshare.ui.screens.PhoneCloneScreen
 import com.swiftshare.ui.screens.RadarScanScreen
+import com.swiftshare.ui.screens.StorageAnalyzerScreen
 import com.swiftshare.ui.screens.SafeBoxScreen
 import com.swiftshare.ui.screens.StatusSaverScreen
 import com.swiftshare.ui.screens.TransferHistoryScreen
@@ -552,6 +553,13 @@ class MainActivity : FragmentActivity() {
                     GlobalSearchScreen(
                         onBack = { navController.popBackStack() },
                         onNavigate = { route -> navController.navigate(route) }
+                    )
+                }
+
+                // 18. Storage Analyzer Drill-Down & Batch Deletion
+                composable("storage_analyzer") {
+                    StorageAnalyzerScreen(
+                        onBack = { navController.popBackStack() }
                     )
                 }
             }
