@@ -43,8 +43,8 @@ class SafeBoxVault(
             )
             dao.insert(entity)
 
-            // Delete original file to hide from MediaStore
-            sourceFile.delete()
+            // Securely shred original file before deletion to prevent forensic recovery
+            SafeBoxAuthManager.secureShred(sourceFile)
             true
         } catch (e: Exception) {
             encryptedFile.delete()
