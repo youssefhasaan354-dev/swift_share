@@ -197,8 +197,6 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                         )
                                     } else {
                                         currentIncomingBatchId = offer.batchId
-                                        val destinationDir = com.swiftshare.common.StorageDestinationManager.getDestinationDirectory(context)
-                                        val existingNames = if (destinationDir.exists()) destinationDir.list()?.toSet() ?: emptySet() else emptySet()
 
                                         val session = com.swiftshare.data.entities.SessionEntity(
                                             sessionId = offer.batchId,
@@ -212,16 +210,16 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                             startTime = System.currentTimeMillis()
                                         )
                                         val items = offer.files.map { mi ->
-                                            val alreadyExists = existingNames.contains(mi.name)
+                                            val dedupe = com.swiftshare.common.FileDeduplicator.evaluate(mi, publisher)
                                             com.swiftshare.data.entities.TransferItemEntity(
                                                 sessionId = offer.batchId,
                                                 fileId = mi.fileId,
-                                                name = mi.name,
+                                                name = dedupe.finalName,
                                                 size = mi.size,
                                                 mimeType = mi.mimeType,
-                                                transferredBytes = if (alreadyExists) mi.size else 0L,
-                                                status = if (alreadyExists) "EXISTS" else "PENDING",
-                                                uriOrPath = mi.name
+                                                transferredBytes = if (dedupe.isDuplicate) mi.size else 0L,
+                                                status = if (dedupe.isDuplicate) "EXISTS" else "PENDING",
+                                                uriOrPath = if (dedupe.isDuplicate) dedupe.existingEntry?.uriString ?: dedupe.finalName else dedupe.finalName
                                             )
                                         }
                                         db.sessionDao().insertSession(session)
@@ -235,7 +233,8 @@ class SwiftShareViewModel(application: Application) : AndroidViewModel(applicati
                                 msg.manifest?.let { manifest ->
                                     currentIncomingBatchId = manifest.batchId
                                     manifest.files.forEach { item ->
-                                        dataChannel.registerManifestItem(item)
+                                        val dedupe = com.swiftshare.common.FileDeduplicator.evaluate(item, publisher)
+                                        dataChannel.registerManifestItem(item.copy(name = dedupe.finalName))
                                     }
                                 }
                             }

@@ -217,7 +217,11 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Details**:
   - **Receiver Transfer Offer Dialog**: `RadarScanScreen` observes `viewModel.incomingTransferOffer` and renders an `AlertDialog` displaying "Allow <nickname> to send N files (X MB)?" with "Allow" (calls `acceptIncomingOffer`) and "Decline" (calls `rejectIncomingOffer`).
   - **Free Space Enforcement**: `SwiftShareViewModel` checks `freeBytes < offer.totalBytes + 50MB` safety headroom before presenting the offer, immediately rejecting with `NOT_ENOUGH_SPACE` reason if space is insufficient.
-  - **Item Deduplication**: Checks incoming file manifest items against existing destination directory entries and flags matching files.
+  - **Item Deduplication (Defect 2 Fix - Verified by Real JVM Tests `DeduplicationTest.kt`)**:
+    - Replaced buggy name-only deduplication (which silently skipped different files sharing the same name) with `FileDeduplicator` querying through `ReceivedFilePublisher.findExisting(name)`.
+    - Strict skip criteria: ONLY skips if file name AND size AND (matching or absent) SHA-256 match.
+    - Different size OR different SHA-256 disambiguates via `SafeFileName.resolveUniqueName` to `"name (1).ext"`, registering with `HighSpeedDataChannel` so the file is received cleanly without overwriting.
+    - 6 unit tests passing in `DeduplicationTest.kt`.
   - **Bidirectional Cancellation**: Sender or receiver can cancel an item or batch; sends `CancelTransfer` control message, updates Room session status to `CANCELLED`, cleans up sockets, and shuts down foreground service.
   - **Transfer Result Screen**: Created `TransferResultScreen` wired in `MainActivity` navigation graph (`transfer_result`), presenting transfer summary and actions: "Open" (opens destination folder via Intent), "Retry" (returns to radar connection), "Send More" (navigates to file picker), and "Done" (returns home).
 - **Files Touched**:

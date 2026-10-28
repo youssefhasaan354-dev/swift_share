@@ -52,6 +52,30 @@ object SafeFileName {
     }
 
     /**
+     * Resolves a unique name against a predicate (e.g. MediaStore query or directory check):
+     * - Sanitizes the name
+     * - De-duplicates if predicate returns true: "name (1).ext", "name (2).ext"
+     */
+    fun resolveUniqueName(
+        rawName: String?,
+        fallbackExtension: String = "",
+        existsPredicate: (String) -> Boolean
+    ): String {
+        val sanitized = sanitize(rawName, fallbackExtension)
+        val lastDot = sanitized.lastIndexOf('.')
+        val baseName = if (lastDot > 0) sanitized.substring(0, lastDot) else sanitized
+        val ext = if (lastDot > 0) sanitized.substring(lastDot) else ""
+
+        var candidate = sanitized
+        var count = 1
+        while (existsPredicate(candidate)) {
+            candidate = "$baseName ($count)$ext"
+            count++
+        }
+        return candidate
+    }
+
+    /**
      * Resolves a destination file safely:
      * - Sanitizes the name
      * - De-duplicates if file exists: "name (1).ext", "name (2).ext"
@@ -62,17 +86,10 @@ object SafeFileName {
             destinationDir.mkdirs()
         }
 
-        val sanitized = sanitize(rawName, fallbackExtension)
-        val lastDot = sanitized.lastIndexOf('.')
-        val baseName = if (lastDot > 0) sanitized.substring(0, lastDot) else sanitized
-        val ext = if (lastDot > 0) sanitized.substring(lastDot) else ""
-
-        var candidate = File(destinationDir, sanitized)
-        var count = 1
-        while (candidate.exists()) {
-            candidate = File(destinationDir, "$baseName ($count)$ext")
-            count++
+        val uniqueName = resolveUniqueName(rawName, fallbackExtension) { candidate ->
+            File(destinationDir, candidate).exists()
         }
+        val candidate = File(destinationDir, uniqueName)
 
         // Canonical directory traversal verification
         val destCanonical = destinationDir.canonicalFile
