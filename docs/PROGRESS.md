@@ -10,7 +10,7 @@
 
 | Verification Gate | Result | Details |
 |---|---|---|
-| **JVM Unit Test Suites** | **118 / 118 PASSED** (0 Failures, 0 Errors, 0 Skipped) | 23 Test Suites across discovery, channel, cleaner, safebox, media player, zip, search, settings, and webshare |
+| **JVM Unit Test Suites** | **120 / 120 PASSED** (0 Failures, 0 Errors, 0 Skipped) | 23 Test Suites across discovery, channel, cleaner, safebox, media player, zip, search, settings, and webshare |
 | **Android Lint** | **0 Errors** (`BUILD SUCCESSFUL`) | 100% of the 8 pre-existing errors on `main` eliminated |
 | **Release Build (R8)** | **BUILD SUCCESSFUL** (`assembleRelease`) | R8 minification & resource shrinking active. Shrunk APK size: **26.38 MB** (`app/build/outputs/apk/release/app-release.apk`) |
 | **Debug Build** | **BUILD SUCCESSFUL** (`assembleDebug`) | Packaged debug APK: **49.14 MB** (`app/build/outputs/apk/debug/app-debug.apk`) |
@@ -93,8 +93,8 @@ Every defect diagnosed during the Phase 0 architectural audit has been resolved 
 | **T4.2 ZIP Explorer (Zip-Slip)** | **VERIFIED BY REAL UNIT TESTS** | `ZipExplorerTest.kt` (4/4 passed, malicious archive blocked) |
 | **T4.3 Global Search Engine** | **VERIFIED BY REAL UNIT TESTS** | `GlobalSearchTest.kt` (6/6 passed) |
 | **T4.4 Storage Analyzer Drill-Down**| **VERIFIED BY REAL UNIT TESTS** | `StorageAnalyzerTest.kt` (4/4 passed) |
-| **T4.5 Cleaner Engine** | **VERIFIED BY REAL UNIT TESTS** | `CleanerEngineTest.kt` (7/7 passed) |
-| **T4.6 SafeBox Biometrics & Shred**| **VERIFIED BY REAL UNIT TESTS** | `SafeBoxSecurityTest.kt` (6/6 passed) |
+| **T4.5 Cleaner Engine** | **VERIFIED BY REAL UNIT TESTS** | `CleanerEngineTest.kt` (9/9 passed) |
+| **T4.6 SafeBox Biometrics & Shred**| **VERIFIED BY REAL UNIT TESTS** | `SafeBoxSecurityTest.kt` (6/6 passed) *(Note: see Flash Storage caveat)* |
 | **T4.7 App Settings & Theme** | **VERIFIED BY REAL UNIT TESTS** | `SettingsManagerTest.kt` (4/4 passed) |
 | **T4.8 PC Web Dashboard ZIP** | **VERIFIED BY REAL UNIT TESTS** | `WebShareZipTest.kt` (5/5 passed) |
 
@@ -472,12 +472,12 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
 - **Status**: DONE
-- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 9/9 passed)
 - **Verification Details**:
   - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
-  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM`), encrypted vault directories (`.safebox`, `SafeBox`, `.vault`), or system directories. Canonical path verification enforces that `cleanSelected` rejects any file outside the designated root directories.
   - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
-  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+  - **Unit Tests**: 9 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, clean execution, strict rejection of files outside target directories, and comprehensive DCIM/SafeBox protection.
 - **Files Touched**:
   - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
   - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
@@ -492,7 +492,9 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
 - **Verification Details**:
   - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
-  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile("rws")` flushing zeroes to disk before deleting, preventing file system forensic recovery.
+    > [!IMPORTANT]
+    > **Technical Limitation on Flash Memory**: Software-level zero-filling does *not* guarantee physical bit eradication on modern solid-state NAND flash storage (eMMC, UFS, NVMe). Due to the Flash Translation Layer (FTL), wear-leveling algorithms, write amplification, controller overprovisioning, and bad block retirement, writing zeros to an existing logical file offset writes to newly allocated flash blocks; original data remains on physical silicon cells until garbage collection or TRIM cycles occur.
   - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
   - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
   - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
@@ -608,12 +610,12 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
 - **Status**: DONE
-- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 9/9 passed)
 - **Verification Details**:
   - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
-  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM`), encrypted vault directories (`.safebox`, `SafeBox`, `.vault`), or system directories. Canonical path verification enforces that `cleanSelected` rejects any file outside the designated root directories.
   - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
-  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+  - **Unit Tests**: 9 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, clean execution, strict rejection of files outside target directories, and comprehensive DCIM/SafeBox protection.
 - **Files Touched**:
   - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
   - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
@@ -628,7 +630,9 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
 - **Verification Details**:
   - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
-  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile("rws")` flushing zeroes to disk before deleting, preventing file system forensic recovery.
+    > [!IMPORTANT]
+    > **Technical Limitation on Flash Memory**: Software-level zero-filling does *not* guarantee physical bit eradication on modern solid-state NAND flash storage (eMMC, UFS, NVMe). Due to the Flash Translation Layer (FTL), wear-leveling algorithms, write amplification, controller overprovisioning, and bad block retirement, writing zeros to an existing logical file offset writes to newly allocated flash blocks; original data remains on physical silicon cells until garbage collection or TRIM cycles occur.
   - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
   - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
   - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
@@ -778,12 +782,12 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
 - **Status**: DONE
-- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 9/9 passed)
 - **Verification Details**:
   - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
-  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM`), encrypted vault directories (`.safebox`, `SafeBox`, `.vault`), or system directories. Canonical path verification enforces that `cleanSelected` rejects any file outside the designated root directories.
   - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
-  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+  - **Unit Tests**: 9 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, clean execution, strict rejection of files outside target directories, and comprehensive DCIM/SafeBox protection.
 - **Files Touched**:
   - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
   - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
@@ -798,7 +802,9 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
 - **Verification Details**:
   - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
-  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile("rws")` flushing zeroes to disk before deleting, preventing file system forensic recovery.
+    > [!IMPORTANT]
+    > **Technical Limitation on Flash Memory**: Software-level zero-filling does *not* guarantee physical bit eradication on modern solid-state NAND flash storage (eMMC, UFS, NVMe). Due to the Flash Translation Layer (FTL), wear-leveling algorithms, write amplification, controller overprovisioning, and bad block retirement, writing zeros to an existing logical file offset writes to newly allocated flash blocks; original data remains on physical silicon cells until garbage collection or TRIM cycles occur.
   - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
   - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
   - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.
@@ -1080,12 +1086,12 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 
 ### T4.5 (D5): Cleaner Engine (Leftovers, Cache, Obsolete APKs, Large Files, Duplicates)
 - **Status**: DONE
-- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 7/7 passed)
+- **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`CleanerEngineTest.kt`, 9/9 passed)
 - **Verification Details**:
   - **Cleaner Engine (`CleanerEngine.kt`)**: Scans cache directories, `.tmp`, `.log`, `.bak`, `.thumb`, `.part.meta`, and empty directories (`CACHE_TEMP`); standalone `.apk` files in Download/temp directories (`OBSOLETE_APKS`); uninstalled package remnants in `Android/data` and `Android/obb` (`APP_LEFTOVERS`); large files >= 50 MB (`LARGE_FILES`, unselected by default); and duplicates grouped by identical file size and confirmed via SHA-256 hash comparison (`DUPLICATES`, keeping original and marking replicas).
-  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM/Camera`), encrypted vault directories (`.safebox`, `.vault`), or system directories.
+  - **Safety Rules**: Strict exclusion prevents scanning or deleting user camera media (`DCIM`), encrypted vault directories (`.safebox`, `SafeBox`, `.vault`), or system directories. Canonical path verification enforces that `cleanSelected` rejects any file outside the designated root directories.
   - **UI Integration (`CleanerScreen.kt`)**: Displays categorized pills with item counts, details (e.g. "Duplicate of <file>"), item checkboxes, and safety confirmation dialog detailing protected items.
-  - **Unit Tests**: 7 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, and clean execution.
+  - **Unit Tests**: 9 unit tests in `CleanerEngineTest.kt` testing cache/temp detection, obsolete APK discovery, uninstalled app leftover identification, large file safe default (unselected), duplicate file detection by size and SHA-256, protected file safeguard enforcement, clean execution, strict rejection of files outside target directories, and comprehensive DCIM/SafeBox protection.
 - **Files Touched**:
   - `app/src/main/java/com/swiftshare/cleaner/CleanerEngine.kt` (new)
   - `app/src/main/java/com/swiftshare/ui/SwiftShareViewModel.kt`
@@ -1100,7 +1106,9 @@ An architectural inspection was performed on `flutter_ios_companion/lib/services
 - **Verification Mode**: VERIFIED BY REAL UNIT TESTS (`SafeBoxSecurityTest.kt`, 6/6 passed)
 - **Verification Details**:
   - **Security & Auth (`SafeBoxAuthManager.kt`)**: Biometric prompt integration via `androidx.biometric.BiometricPrompt`. Salted SHA-256 PIN hashing, recovery question and answer hash in private preferences, `changePin` routine, and `resetPinWithRecovery` routine.
-  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile` flushing zeroes to disk before deleting, preventing forensic recovery.
+  - **Secure Shredding (`secureShred`)**: Zero-overwrite file shredding using `RandomAccessFile("rws")` flushing zeroes to disk before deleting, preventing file system forensic recovery.
+    > [!IMPORTANT]
+    > **Technical Limitation on Flash Memory**: Software-level zero-filling does *not* guarantee physical bit eradication on modern solid-state NAND flash storage (eMMC, UFS, NVMe). Due to the Flash Translation Layer (FTL), wear-leveling algorithms, write amplification, controller overprovisioning, and bad block retirement, writing zeros to an existing logical file offset writes to newly allocated flash blocks; original data remains on physical silicon cells until garbage collection or TRIM cycles occur.
   - **Photo Viewer Dialog**: Decrypts encrypted photos into in-memory bitmap for zero-trace viewing; immediately wipes temporary files on dismissal.
   - **UI Integration (`SafeBoxScreen.kt`)**: Initial setup with PIN and security recovery question, lock screen with PIN / Biometrics / Forgot PIN recovery, change PIN dialog, and in-memory photo viewer dialog.
   - **Unit Tests**: 6 unit tests in `SafeBoxSecurityTest.kt` testing PIN setup and verification, PIN change, case-insensitive recovery question verification, recovery PIN reset, and zero-overwrite shredding for individual files and recursive directories.

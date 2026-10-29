@@ -189,6 +189,83 @@ class CleanerEngineTest {
     }
 
     @Test(timeout = 60000)
+    fun testCleanerNeverDeletesOutsideTargetDirectory() = runBlocking {
+        val targetRoot = tempFolder.newFolder("target_dir")
+        val outsideRoot = tempFolder.newFolder("outside_dir")
+
+        val targetJunk = File(targetRoot, "target.tmp").apply { writeBytes(ByteArray(512)) }
+        val outsideFile = File(outsideRoot, "system_important.tmp").apply { writeBytes(ByteArray(1024)) }
+
+        val engine = CleanerEngine(
+            rootDirsProvider = { listOf(targetRoot) },
+            installedPackagesProvider = { emptySet() },
+            ioDispatcher = Dispatchers.Unconfined
+        )
+
+        // 1. Scan must never discover files outside target root
+        val scanned = engine.startScan()
+        assertEquals(1, scanned.size)
+        assertEquals(targetJunk, scanned[0].file)
+        assertFalse(scanned.any { it.file == outsideFile })
+
+        // 2. Explicit attempt to clean an outside file must be rejected
+        val outsideItem = CleanableItem(
+            file = outsideFile,
+            name = outsideFile.name,
+            size = outsideFile.length(),
+            category = CleanerCategory.CACHE_TEMP,
+            isSelected = true
+        )
+        val result = engine.cleanSelected(listOf(outsideItem))
+        assertEquals(0, result.deletedCount)
+        assertEquals(1, result.failedCount)
+        assertTrue("File outside target directory must remain untouched", outsideFile.exists())
+    }
+
+    @Test(timeout = 60000)
+    fun testCleanerNeverTouchesDcimCameraOrSafeBoxVault() = runBlocking {
+        val root = tempFolder.newFolder("root_with_protected_folders")
+
+        val dcimCamera = File(root, "DCIM/Camera").apply { mkdirs() }
+        val cameraPhoto = File(dcimCamera, "IMG_20261029.jpg").apply { writeBytes(ByteArray(4096)) }
+
+        val dcimVacation = File(root, "DCIM/Vacation").apply { mkdirs() }
+        val vacationPhoto = File(dcimVacation, "beach.png").apply { writeBytes(ByteArray(2048)) }
+
+        val dotSafeBox = File(root, ".safebox").apply { mkdirs() }
+        val vaultFile = File(dotSafeBox, "my_secrets.vault").apply { writeBytes(ByteArray(8192)) }
+
+        val safeBoxPlain = File(root, "SafeBox").apply { mkdirs() }
+        val vaultDoc = File(safeBoxPlain, "confidential.pdf").apply { writeBytes(ByteArray(1024)) }
+
+        val engine = CleanerEngine(
+            rootDirsProvider = { listOf(root) },
+            installedPackagesProvider = { emptySet() },
+            ioDispatcher = Dispatchers.Unconfined
+        )
+
+        // None of these should be scanned as junk
+        val scanned = engine.startScan()
+        assertTrue("No protected DCIM or SafeBox files should be discovered", scanned.isEmpty())
+
+        // Explicit deletion attempt must be strictly rejected
+        val protectedItems = listOf(
+            CleanableItem(cameraPhoto, cameraPhoto.name, cameraPhoto.length(), CleanerCategory.CACHE_TEMP),
+            CleanableItem(vacationPhoto, vacationPhoto.name, vacationPhoto.length(), CleanerCategory.CACHE_TEMP),
+            CleanableItem(vaultFile, vaultFile.name, vaultFile.length(), CleanerCategory.CACHE_TEMP),
+            CleanableItem(vaultDoc, vaultDoc.name, vaultDoc.length(), CleanerCategory.CACHE_TEMP)
+        )
+        val result = engine.cleanSelected(protectedItems)
+        assertEquals(0, result.deletedCount)
+        assertEquals(4, result.failedCount)
+
+        assertTrue(cameraPhoto.exists())
+        assertTrue(vacationPhoto.exists())
+        assertTrue(vaultFile.exists())
+        assertTrue(vaultDoc.exists())
+    }
+
+    @Test(timeout = 60000)
     fun testCleanSelectedExecution() = runBlocking {
         val root = tempFolder.newFolder("clean_target")
         val junkFile1 = File(root, "cache_1.tmp").apply { writeBytes(ByteArray(1024)) }

@@ -215,8 +215,10 @@ class CleanerEngine(
         var deleted = 0
         var failed = 0
 
+        val allowedRoots = rootDirsProvider?.invoke() ?: getProductionRootDirs()
+
         for (item in itemsToClean) {
-            if (isProtectedFile(item.file)) {
+            if (isProtectedFile(item.file) || !isWithinRoots(item.file, allowedRoots)) {
                 failed++
                 continue
             }
@@ -244,13 +246,22 @@ class CleanerEngine(
         CleanResult(freed, deleted, failed)
     }
 
+    private fun isWithinRoots(file: File, roots: List<File>): Boolean {
+        if (roots.isEmpty()) return true
+        val canonicalFile = try { file.canonicalFile } catch (_: Exception) { file.absoluteFile }
+        return roots.any { root ->
+            val canonicalRoot = try { root.canonicalFile } catch (_: Exception) { root.absoluteFile }
+            canonicalFile.startsWith(canonicalRoot)
+        }
+    }
+
     fun isProtectedFile(file: File): Boolean {
         val path = file.absolutePath.lowercase().replace('\\', '/')
         return path.contains("/.safebox") ||
             path.contains("/safebox") ||
             path.contains(".vault") ||
             path.contains("/.git") ||
-            path.contains("/dcim/camera") ||
+            path.contains("/dcim") ||
             path.contains("/android/system") ||
             path.contains("/system/")
     }
