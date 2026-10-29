@@ -6,8 +6,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
+import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.swiftshare.siplayer.equalizer.EqualizerController
 import com.swiftshare.siplayer.lyrics.LrcLyrics
@@ -89,13 +92,15 @@ class SwiftMediaPlayer(private val context: Context) {
 
     init {
         val filter = IntentFilter(MusicPlaybackService.BROADCAST_MEDIA_CONTROL)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(mediaControlReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(mediaControlReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            context,
+            mediaControlReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
+    @OptIn(UnstableApi::class)
     fun initialize(): ExoPlayer {
         if (exoPlayer != null) return exoPlayer!!
 

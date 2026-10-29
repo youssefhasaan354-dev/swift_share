@@ -210,3 +210,4 @@ Verify that extracting a malicious ZIP archive containing relative path sequence
 | **7. PC Web Dashboard** | [ ] Pass / [ ] Fail | [ ] Pass / [ ] Fail | PIN auth & upload | ________ |
 | **8. ZIP Streaming** | [ ] Pass / [ ] Fail | [ ] Pass / [ ] Fail | HTTP streaming zip | ________ |
 | **9. Zip-Slip Defense** | [ ] Pass / [ ] Fail | [ ] Pass / [ ] Fail | Path escape blocked | ________ |
+

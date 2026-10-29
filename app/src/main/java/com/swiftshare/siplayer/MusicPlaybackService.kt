@@ -146,7 +146,12 @@ class MusicPlaybackService : Service() {
         val playPausePendingIntent = createActionPendingIntent(playPauseAction, 2)
         val nextPendingIntent = createActionPendingIntent(ACTION_NEXT, 3)
 
-        val builder = Notification.Builder(this, CHANNEL_ID)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
             .setContentTitle(currentTitle)
             .setContentText(currentArtist.ifEmpty { "SwiftShare Music Player" })
             .setSmallIcon(R.mipmap.ic_launcher)
