@@ -1,6 +1,7 @@
 package com.swiftshare.ui.screens
 
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -182,7 +183,9 @@ fun InviteScreen(
 
                 Button(
                     onClick = {
-                        val btAdapter = BluetoothAdapter.getDefaultAdapter()
+                        val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+                        @Suppress("DEPRECATION")
+                        val btAdapter = btManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
                         if (btAdapter == null) {
                             Toast.makeText(context, strings.bluetoothNotSupported, Toast.LENGTH_LONG).show()
                             return@Button

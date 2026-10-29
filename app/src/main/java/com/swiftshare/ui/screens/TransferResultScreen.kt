@@ -191,7 +191,7 @@ fun TransferResultScreen(
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(14.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(brush = Brush.linearGradient(listOf(AccentCyan, PrimaryBlue)))
+                border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(brush = Brush.linearGradient(listOf(AccentCyan, PrimaryBlue)))
             ) {
                 Text("Send More Files", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = AccentCyan)
             }

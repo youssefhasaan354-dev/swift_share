@@ -627,6 +627,7 @@ class EmbeddedWebShareServer(
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         context?.contentResolver?.loadThumbnail(Uri.fromFile(file), Size(256, 256), null)
                     } else {
+                        @Suppress("DEPRECATION")
                         android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                     }
                 }

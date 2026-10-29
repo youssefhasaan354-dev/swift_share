@@ -130,6 +130,7 @@ class MusicPlaybackService : Service() {
         mediaSession?.setMetadata(metadata)
     }
 
+    @Suppress("DEPRECATION")
     private fun buildNotification(): Notification {
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP

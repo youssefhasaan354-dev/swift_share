@@ -24,13 +24,15 @@ data class ConnectionPayload(
     val isExpired: Boolean
         get() = (System.currentTimeMillis() - timestamp) > ttlMillis
     fun toJson(): String {
-        return Json { ignoreUnknownKeys = true; prettyPrint = false }.encodeToString(this)
+        return json.encodeToString(this)
     }
 
     companion object {
+        private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
+
         fun fromJson(jsonStr: String): ConnectionPayload? {
             return try {
-                Json { ignoreUnknownKeys = true }.decodeFromString<ConnectionPayload>(jsonStr)
+                json.decodeFromString<ConnectionPayload>(jsonStr)
             } catch (e: Exception) {
                 null
             }
